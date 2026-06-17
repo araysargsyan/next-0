@@ -1,0 +1,52 @@
+"use server";
+
+import {cookies} from "next/headers";
+import {parseSetCookie} from "set-cookie-parser";
+import {redirect} from "next/navigation";
+import {API_URL} from "@/config";
+import {createLogger} from "@/lib/logger";
+
+const log = createLogger('SignInAction', 'magenta');
+
+export async function signInAction(_: any, formData: FormData) {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    log(`[START]: (${email})`, { email });
+
+    try {
+        const res = await fetch(`${API_URL}/api/auth/sign-in`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({email, password}),
+        });
+
+        if (!res.ok) {
+            log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
+            return {error: "Неверный email или пароль"};
+        }
+
+        const headerCookies = res.headers.getSetCookie()
+        const cookieStore = await cookies();
+        if (headerCookies) {
+            log(`[AUTH]: (${email}) ->`, "Committing session cookies");
+            const parsedCookies = parseSetCookie(headerCookies);
+
+            for (const {name, value, ...options} of parsedCookies) {
+                if (name) {
+                    cookieStore.set(name, value, options as any);
+                }
+            }
+        }
+
+        log(`[FINISH]: (${email}) ->`, "Success, redirecting to home");
+        // redirect('/') must be outside try/catch or handled carefully, 
+        // but Next.js 15+ handles it in Server Actions.
+    } catch (e: any) {
+        if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
+        log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
+        return {error: "Внутренняя ошибка сервера"};
+    }
+
+    redirect("/");
+}
