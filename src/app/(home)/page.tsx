@@ -1,4 +1,4 @@
-import {protFetch} from "@/lib/AuthService";
+import {protFetch} from "@/lib";
 import ImageUploadForm from "@/components/ImageUploadForm";
 import { createLogger } from "@/lib/logger";
 

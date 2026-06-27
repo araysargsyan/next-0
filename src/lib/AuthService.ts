@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
-import { API_URL, BASE_URL } from "@/config";
-import { createLogger } from "./logger";
 import { redirect } from "next/navigation";
+import { createLogger } from "./logger";
 
 const log = createLogger('AuthService', 'green');
 
-type TRefreshResponse =
+export type TRefreshResponse =
     | {
         success: true;
         cookieString: string;
@@ -17,16 +16,90 @@ type TRefreshResponse =
         errorRedirect: NextResponse;
     };
 
+export interface ParsedCookie {
+    name: string;
+    value: string;
+    domain?: string;
+    expires?: Date;
+    httpOnly?: boolean;
+    maxAge?: number;
+    path?: string;
+    sameSite?: 'lax' | 'strict' | 'none';
+    secure?: boolean;
+    priority?: 'low' | 'medium' | 'high';
+    partitioned?: boolean;
+}
+
+export interface AuthSDKConfig {
+    apiUrl: string;
+    baseUrl: string;
+    cookieNames?: {
+        accessToken?: string;
+        refreshToken?: string;
+    };
+    routes?: {
+        signOut?: string;
+        refreshAndReturn?: string;
+    };
+    timeoutMs?: number;
+}
+
+export interface AuthDependencies {
+    cookies?: typeof cookies;
+    headers?: typeof headers;
+    redirect?: typeof redirect;
+}
+
+export interface InternalAuthConfig {
+    apiUrl: string;
+    baseUrl: string;
+    cookieNames: {
+        accessToken: string;
+        refreshToken: string;
+    };
+    routes: {
+        signOut: string;
+        refreshAndReturn: string;
+    };
+    timeoutMs: number;
+}
+
 export class AuthService {
-    private static activeRefreshPromise: Promise<TRefreshResponse> | null = null;
+    private readonly config: InternalAuthConfig;
+    private readonly deps: Required<AuthDependencies>;
+
+    constructor(config: AuthSDKConfig, deps: AuthDependencies = {}) {
+        this.config = {
+            apiUrl: config.apiUrl,
+            baseUrl: config.baseUrl,
+            cookieNames: {
+                accessToken: config.cookieNames?.accessToken || "accessToken",
+                refreshToken: config.cookieNames?.refreshToken || "refreshToken",
+            },
+            routes: {
+                signOut: config.routes?.signOut || "/api/auth/sign-out",
+                refreshAndReturn: config.routes?.refreshAndReturn || "/api/auth/refresh-and-return",
+            },
+            timeoutMs: config.timeoutMs ?? 5000,
+        };
+
+        this.deps = {
+            cookies: deps.cookies || cookies,
+            headers: deps.headers || headers,
+            redirect: deps.redirect || redirect,
+        };
+    }
 
     /**
      * ГЛАВНЫЙ МЕТОД: Выполняет проактивный рефреш и Double Sync.
      */
-    static async getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }> {
+    async getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }> {
         const { pathname } = req.nextUrl;
-        const accessToken = req.cookies.get("accessToken")?.value;
-        const refreshToken = req.cookies.get("refreshToken")?.value;
+        const accessTokenName = this.config.cookieNames.accessToken;
+        const refreshTokenName = this.config.cookieNames.refreshToken;
+
+        const accessToken = req.cookies.get(accessTokenName)?.value;
+        const refreshToken = req.cookies.get(refreshTokenName)?.value;
 
         const requestHeaders = new Headers(req.headers);
         let rawSetCookies: string[] = [];
@@ -35,7 +108,7 @@ export class AuthService {
         if (!accessToken && refreshToken) {
             log(`[AUTH]: (${pathname}) ->`, 'Access token missing. Attempting refresh...');
 
-            const refresh = await this.refresh(pathname, req.url);
+            const refresh = await this.refresh(pathname, refreshToken, req.url);
 
             if (refresh.success) {
                 log(`[AUTH]: (${pathname}) ->`, 'Refresh successful. Performing Double Sync.');
@@ -56,9 +129,7 @@ export class AuthService {
 
         if (rawSetCookies.length > 0) {
             log(`[AUTH]: (${pathname}) ->`, 'Committing refreshed cookies to browser');
-            rawSetCookies.forEach(cookieStr => {
-                response.headers.append('Set-Cookie', cookieStr);
-            });
+            this.applySetCookies(response, rawSetCookies);
         }
 
         return { response, isRefreshed };
@@ -67,16 +138,17 @@ export class AuthService {
     /**
      * ПРОДВИНУТЫЙ FETCH: Автоматически обрабатывает 401 и делает Silent Retry в экшенах.
      */
-    static async protFetch<TBody = unknown>(
+    async protFetch<TBody = unknown>(
         path: string,
         options: Omit<RequestInit, "body"> & { body?: TBody, isAction?: boolean } = {}
     ): Promise<Response> {
         const { method = "GET", body, isAction = false, ...fetchOptions } = options;
         log(`[FETCH-START]: (${path})`, { method, isAction });
 
-        const cookieStore = await cookies();
-        const headersList = await headers();
-        const currentUrl = headersList.get('referer') || BASE_URL;
+        const cookieStore = await this.deps.cookies();
+        const headersList = await this.deps.headers();
+        const currentUrl = headersList.get('referer') || this.config.baseUrl;
+        const refreshTokenName = this.config.cookieNames.refreshToken;
 
         const getHeaders = () => {
             const h = new Headers(fetchOptions.headers || {});
@@ -87,7 +159,7 @@ export class AuthService {
             return h;
         };
 
-        const doFetch = () => fetch(`${API_URL}${path}`, {
+        const doFetch = () => fetch(`${this.config.apiUrl}${path}`, {
             method,
             headers: getHeaders(),
             body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
@@ -101,31 +173,28 @@ export class AuthService {
             if (isAction) {
                 log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized in Action, attempting silent refresh and retry');
 
-                const refresh = await this.refresh("");
+                const refreshToken = cookieStore.get(refreshTokenName)?.value;
+                if (!refreshToken) {
+                    log(`[FETCH-ERROR]: (${path}) ->`, 'No refresh token available, redirecting to sign-out');
+                    this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
+                }
+
+                const refresh = await this.refresh("", refreshToken, this.config.baseUrl);
 
                 if (refresh.success) {
                     log(`[FETCH-AUTH]: (${path}) ->`, 'Refresh successful, committing cookies and retrying');
-
-                    // Используем СОБСТВЕННЫЙ парсер (точно как в Next.js)
-                    refresh.rawSetCookies.forEach(cookieStr => {
-                        const parsed = this.parseSetCookie(cookieStr);
-                        if (parsed) {
-                            const { name, value, ...opts } = parsed;
-                            // @ts-ignore
-                            cookieStore.set(name, value, opts);
-                        }
-                    });
+                    await this.commitCookies(refresh.rawSetCookies);
 
                     res = await doFetch();
                     log(`[FETCH-FINISH]: (${path}) ->`, 'Retry successful', { status: res.status });
                     return res;
                 } else {
                     log(`[FETCH-ERROR]: (${path}) ->`, 'Refresh failed in Action, redirecting to sign-out');
-                    redirect(`/api/auth/sign-out?error=session_expired`);
+                    this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
                 }
             } else {
                 log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized, redirecting to refresh route');
-                redirect(`/api/auth/refresh-and-return?returnUrl=${encodeURIComponent(currentUrl)}`);
+                this.deps.redirect(`${this.config.routes.refreshAndReturn}?returnUrl=${encodeURIComponent(currentUrl)}`);
             }
         }
 
@@ -136,20 +205,28 @@ export class AuthService {
     /**
      * РЕАНИМАТОР: Обрабатывает GET запрос на /api/auth/refresh-and-return.
      */
-    static async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse> {
+    async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse> {
         const { searchParams } = new URL(req.url);
         const returnUrl = searchParams.get("returnUrl") || "/";
 
         log(`[REANIMATOR-START]: (${returnUrl})`, "Re-authenticating and returning");
 
-        const refresh = await this.refresh(returnUrl, req.url);
+        const cookieStore = await this.deps.cookies();
+        const refreshTokenName = this.config.cookieNames.refreshToken;
+        const refreshToken = cookieStore.get(refreshTokenName)?.value;
+
+        if (!refreshToken) {
+            log(`[REANIMATOR-ERROR]: (${returnUrl}) ->`, 'No refresh token found');
+            const signOutUrl = new URL(`${this.config.routes.signOut}?error=session_expired`, req.url);
+            return NextResponse.redirect(signOutUrl);
+        }
+
+        const refresh = await this.refresh(returnUrl, refreshToken, req.url);
 
         if (refresh.success) {
             log(`[REANIMATOR-FINISH]: (${returnUrl}) ->`, 'Success, redirecting back');
             const response = NextResponse.redirect(new URL(returnUrl, req.url));
-            refresh.rawSetCookies.forEach(cookieStr => {
-                response.headers.append('Set-Cookie', cookieStr);
-            });
+            this.applySetCookies(response, refresh.rawSetCookies);
             return response;
         }
 
@@ -158,77 +235,82 @@ export class AuthService {
     }
 
     /**
-     * НИЗКОУРОВНЕВЫЙ РЕФРЕШ: Обновляет токены на бэкенде с дедупликацией.
+     * НИЗКОУРОВНЕВЫЙ РЕФРЕШ: Обновляет токены на бэкенде.
      */
-    static async refresh(contextPath: string, reqUrl: string = BASE_URL): Promise<TRefreshResponse> {
-        const safeUrl = new URL(contextPath || "", BASE_URL);
+    async refresh(contextPath: string, refreshToken: string, reqUrl: string = this.config.baseUrl): Promise<TRefreshResponse> {
+        const safeUrl = new URL(contextPath || "", this.config.baseUrl);
         const logPath = safeUrl.pathname;
 
         log(`[REFRESH-START]: (${logPath})`, 'Refreshing tokens...');
 
-        if (this.activeRefreshPromise) {
-            log(`[REFRESH-FINISH]: (${logPath}) ->`, 'Reusing existing refresh promise');
-            return this.activeRefreshPromise;
-        }
+        const signOutUrl = new URL(`${this.config.routes.signOut}?error=session_expired`, reqUrl);
+        const errorResponse = {
+            success: false as const,
+            errorRedirect: NextResponse.redirect(signOutUrl)
+        };
 
-        this.activeRefreshPromise = (async (): Promise<TRefreshResponse> => {
-            const signOutUrl = new URL("/api/auth/sign-out?error=session_expired", reqUrl);
-            const errorResponse = {
-                success: false as const,
-                errorRedirect: NextResponse.redirect(signOutUrl)
-            };
+        try {
+            const res = await fetch(`${this.config.apiUrl}/api/auth/refresh`, {
+                method: "GET",
+                headers: { Cookie: `${this.config.cookieNames.refreshToken}=${refreshToken}` },
+                signal: AbortSignal.timeout(this.config.timeoutMs),
+            });
 
-            try {
-                const cookieStore = await cookies();
-                const refreshToken = cookieStore.get("refreshToken")?.value;
+            if (res.ok) {
+                const rawSetCookies = res.headers.getSetCookie();
 
-                if (!refreshToken) {
-                    log(`[REFRESH-ERROR]: (${logPath}) ->`, 'No refresh token found');
+                if (rawSetCookies.length === 0) {
+                    log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Backend returned 200 but NO Set-Cookie headers');
                     return errorResponse;
                 }
 
-                const res = await fetch(`${API_URL}/api/auth/refresh`, {
-                    method: "GET",
-                    headers: { Cookie: `refreshToken=${refreshToken}` },
-                });
+                const cookieString = rawSetCookies
+                    .map(s => s.split(';')[0])
+                    .join("; ");
 
-                if (res.ok) {
-                    const rawSetCookies = res.headers.getSetCookie();
-
-                    if (rawSetCookies.length === 0) {
-                        log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Backend returned 200 but NO Set-Cookie headers');
-                        return errorResponse;
-                    }
-
-                    const cookieString = rawSetCookies
-                        .map(s => s.split(';')[0])
-                        .join("; ");
-
-                    log(`[REFRESH-FINISH]: (${logPath}) ->`, 'Success', { count: rawSetCookies.length });
-                    return {
-                        success: true,
-                        cookieString,
-                        rawSetCookies
-                    };
-                }
-
-                log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Backend rejected refresh', { status: res.status });
-                return errorResponse;
-            } catch (e) {
-                log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Critical Error', String(e));
-                return errorResponse;
-            } finally {
-                this.activeRefreshPromise = null;
+                log(`[REFRESH-FINISH]: (${logPath}) ->`, 'Success', { count: rawSetCookies.length });
+                return {
+                    success: true,
+                    cookieString,
+                    rawSetCookies
+                };
             }
-        })();
 
-        return this.activeRefreshPromise;
+            log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Backend rejected refresh', { status: res.status });
+            return errorResponse;
+        } catch (e) {
+            log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Critical Error', String(e));
+            return errorResponse;
+        }
     }
 
     /**
-     * ПРИВАТНЫЙ ПАРСЕР: Реализует логику parseSetCookie из Next.js.
+     * Append raw Set-Cookie strings к response (для Middleware / Route Handlers).
      */
-    private static parseSetCookie(setCookie: string) {
+    private applySetCookies(response: NextResponse, rawSetCookies: string[]): void {
+        rawSetCookies.forEach(cookieStr => {
+            response.headers.append('Set-Cookie', cookieStr);
+        });
+    }
+
+    /**
+     * Коммит parsed cookies в Next.js cookie store (для Actions / Route Handlers).
+     */
+    async commitCookies(rawSetCookies: string[]): Promise<void> {
+        const cookieStore = await this.deps.cookies();
+        rawSetCookies.forEach(cookieStr => {
+            const parsed = this.parseSetCookie(cookieStr);
+            if (parsed) {
+                const { name, value, ...opts } = parsed;
+                cookieStore.set(name, value, opts);
+            }
+        });
+    }
+
+    /**
+     * ПАРСЕР: Реализует логику parseSetCookie из Next.js.
+     */
+    parseSetCookie(setCookie: string): ParsedCookie | undefined {
         if (!setCookie) return undefined;
 
         const pairs: [string, string | boolean][] = setCookie.split(/; */).filter(Boolean).map(pair => {
@@ -247,39 +329,34 @@ export class AuthService {
             ])
         );
 
-        const cookie: any = {
+        const cookie: ParsedCookie = {
             name,
             value: decodeURIComponent(value),
         };
 
-        if (attrs.domain) cookie.domain = attrs.domain;
+        if (attrs.domain) cookie.domain = attrs.domain as string;
         if (attrs.expires) cookie.expires = new Date(attrs.expires as string);
         if (attrs.httponly) cookie.httpOnly = true;
-        if (attrs.maxage && Number(attrs.maxage) !== 0) cookie.maxAge = Number(attrs.maxage);
-        if (attrs.path) cookie.path = attrs.path;
-        
+        if (attrs.maxage !== undefined && !isNaN(Number(attrs.maxage))) cookie.maxAge = Number(attrs.maxage);
+        if (attrs.path) cookie.path = attrs.path as string;
+
         if (typeof attrs.samesite === 'string') {
             const ss = attrs.samesite.toLowerCase();
-            if (['lax', 'strict', 'none'].includes(ss)) cookie.sameSite = ss;
+            if (['lax', 'strict', 'none'].includes(ss)) cookie.sameSite = ss as ParsedCookie['sameSite'];
         }
 
         if (attrs.secure) cookie.secure = true;
 
         if (typeof attrs.priority === 'string') {
             const p = attrs.priority.toLowerCase();
-            if (['low', 'medium', 'high'].includes(p)) cookie.priority = p;
+            if (['low', 'medium', 'high'].includes(p)) cookie.priority = p as ParsedCookie['priority'];
         }
 
         if (attrs.partitioned) cookie.partitioned = true;
 
-        // Финальная очистка: удаляем undefined и ПУСТЫЕ value (как в Next.js)
+        // Финальная очистка: удаляем только undefined (пустые строки оставляем, чтобы куки могли стираться корректно)
         return Object.fromEntries(
-            Object.entries(cookie).filter(([k, v]) => {
-                if (k === 'value' && v === '') return false;
-                return v !== undefined;
-            })
-        );
+            Object.entries(cookie).filter(([_, v]) => v !== undefined)
+        ) as ParsedCookie;
     }
 }
-
-export const protFetch = AuthService.protFetch.bind(AuthService);

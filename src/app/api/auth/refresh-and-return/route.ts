@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { AuthService } from "@/lib/AuthService";
+import { AuthService } from "@/lib";
 
 /**
  * Этот роут — "реаниматор". 

@@ -1,5 +1,5 @@
 import {NextRequest, NextResponse} from "next/server";
-import {AuthService} from "@/lib/AuthService";
+import {AuthService} from "@/lib";
 import {createLogger} from "@/lib/logger";
 
 const PUBLIC_ROUTES = ["/sign-in"];

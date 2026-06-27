@@ -1,103 +1,287 @@
-## Getting Started
+# Next.js 16 Unified Session Management & SDK Gateway
 
-First, run the development server:
+This repository houses a state-of-the-art authentication and session restoration architecture designed specifically for **Next.js 16.2.9**, **React 19.2**, and **Turbopack**. 
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+At the center of this project is the **`AuthService` SDK**, a custom-built, dependency-free library located in `src/lib`. The system solves Next.js's native "Cookie Write-Only" restriction inside Server Components, ensuring zero-flicker UI updates, silent session recovery, and resilient file/form actions with zero data loss.
+
+---
+
+## 🛠️ Tech Stack & Key Conventions
+
+- **Framework**: Next.js 16.2.9 (Dynamic by default; caching is opt-in via `use cache`).
+- **Render Engine**: React 19.2 (Stable Server Actions and View Transitions).
+- **Bundler**: Turbopack (default for dev and builds).
+- **Network Boundary**: `src/proxy.ts` (replaces deprecated `middleware.ts`). Runs on the **full Node.js Runtime**, enabling the use of native Node modules and arbitrary npm packages.
+- **Styling**: TailwindCSS v4 with PostCSS.
+- **Testing**: Node.js native test runner (`node:test`) and assertion engine (`node:assert`).
+
+---
+
+## 🏗️ The Three-Layer Session Protection Architecture
+
+Next.js divides its execution environment into contexts with different cookie mutation rights:
+1. **Proxy / Network Boundary (`src/proxy.ts`)**: Can inspect and modify incoming request headers and outgoing response headers.
+2. **Server Actions & Route Handlers**: Full read and write access to the cookie store using `cookies().set()`.
+3. **Server Components (SSR Page Rendering)**: Strictly **Read-Only** context; attempting to call `cookies().set()` throws a runtime exception.
+
+To handle these boundaries cleanly, the `AuthService` orchestrates a three-layer protection strategy:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Incoming Request                              │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                                     ▼
+                    ┌─────────────────────────────────┐
+                    │     Layer 1: Proactive Proxy    │
+                    │   (Double Sync & Token Refresh) │
+                    └────────────────┬────────────────┘
+                                     │
+                 ┌───────────────────┴───────────────────┐
+                 ▼                                       ▼
+       [Server Actions / Routes]                [Server Components (SSR)]
+   ┌───────────────────────────────┐        ┌───────────────────────────────┐
+   │     Layer 2: Silent Retry     │        │  Layer 3: Reanimator Fallback │
+   │  Direct Cookie Write + Retry  │        │ Redirect-Bounce via GET Route │
+   └───────────────────────────────┘        └───────────────────────────────┘
 ```
 
-## Architecture: The SDK Gateway
+---
 
-The project implements a centralized session management system via a unified **AuthService SDK**. This architecture is specifically engineered to solve the "Cookie Write-Only" limitation of Next.js Server Components while maintaining seamless data integrity across all request types.
+### Layer 1: Proactive Gateway (The Double Sync Pattern)
 
-### The Hybrid Strategy: Why and How
+Executed in `src/proxy.ts` (Middleware boundary). It rotates tokens before the page starts rendering if the access token has expired but a valid refresh token exists.
 
-Next.js imposes strict boundaries on cookie mutations:
-- **Middleware/Proxy**: Can modify headers for both the incoming request and outgoing response.
-- **Server Actions/Route Handlers**: Full read/write access to cookies.
-- **Server Components (Rendering)**: Strictly **Read-Only**.
+- **The Problem**: If a proxy rotates a token, only the outgoing response (`Set-Cookie`) gets updated. The current rendering thread (rendering the Server Components for the active request) would still read the expired/missing cookie from the original request, causing a `401 Unauthorized` during SSR.
+- **The Solution (Double Sync)**: When `AuthService.getAuthorizedResponse` completes a successful refresh, it syncs the new tokens in two places:
+  1. **Request Headers (`Cookie`)**: Injected directly so the current execution context (the Server Components) reads the fresh tokens immediately.
+  2. **Response Headers (`Set-Cookie`)**: Injected into the browser response so the client stores the new cookies for subsequent requests.
 
-Our architecture bridges these gaps using a dual-layer protection model:
+#### Double Sync Flow:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Browser
+    participant Proxy as src/proxy.ts (Middleware)
+    participant ServerComp as Server Component
+    participant Backend as Backend Auth API (/api/auth/refresh)
+    
+    Browser->>Proxy: Request Page (No Access Token, Has Refresh Token)
+    activate Proxy
+    Proxy->>Backend: GET /api/auth/refresh (Cookie: refreshToken)
+    activate Backend
+    Backend-->>Proxy: 200 OK (Set-Cookie: freshAccessToken, freshRefreshToken)
+    deactivate Backend
+    Note over Proxy: Double Sync:<br/>1. Injects fresh tokens into Request Headers<br/>2. Injects Set-Cookie into Response Headers
+    Proxy->>ServerComp: Forward Request with updated Request Headers
+    activate ServerComp
+    ServerComp->>ServerComp: Render Page (Reads fresh tokens from request.headers)
+    ServerComp-->>Proxy: Rendered HTML
+    deactivate ServerComp
+    Proxy-->>Browser: Response with HTML + Set-Cookie (fresh tokens)
+    deactivate Proxy
+```
 
-#### 1. Proactive Gateway (The Double Sync Pattern)
-Executed at the **Network Boundary** (Middleware), this layer acts as a preemptive strike against expired sessions.
-- **Problem**: If Middleware refreshes a token, only the **Response** (`Set-Cookie`) is updated by default. The current execution context (the page being rendered) would still see the old/missing token.
-- **Solution**: `AuthService.getAuthorizedResponse` performs a **Double Sync**. It injects the fresh tokens into `request.headers` (so Server Components see them *now*) and `response.headers` (so the browser saves them for *later*).
-- **Outcome**: 99% of requests are "healed" before they even reach the application logic, ensuring zero UI flickering.
+---
 
-#### 2. Silent Retry (Server Actions & Route Handlers)
-This mechanism is dedicated to **mutations and client-side data fetching**, where process continuity is critical.
-- **Problem**: A session might expire during a background fetch from a Client Component or a file upload in an Action. A standard redirect would break the user's flow.
-- **Solution**: When `protFetch` is called with `{ isAction: true }` (legal in both **Server Actions** and **Route Handlers**), it unlocks the **Direct Commit** mode. Upon detecting a 401:
-    - It triggers `AuthService.refresh()`.
-    - It uses the `cookies().set()` API to manually persist the new state. In Route Handlers, this automatically injects `Set-Cookie` into the API response sent to the browser.
-    - It **re-executes the original request** with the new credentials.
-- **Outcome**: 
-    - **Server Actions**: Mutations complete without data loss.
-    - **Client Components (via API Bridge)**: `fetch()` calls to internal API routes receive fresh data and updated cookies in a single, seamless response. No browser-side interceptors or redirects required.
+### Layer 2: Silent Retry (Server Actions & Route Handlers)
 
-#### 3. Reanimator Fallback (The Rendering Safety Net)
-A fail-safe for the strictly read-only **Server Component Rendering** layer.
-- **Scenario**: If a 401 occurs during a Server Component render (where `cookies().set()` is forbidden), the system cannot "silently" heal itself.
-- **Mechanism**: `protFetch` triggers a stateful redirect to `/api/auth/refresh-and-return`.
-- **Referer Context**: Instead of complex state tracking, we utilize the standard HTTP `Referer` to determine the return path. The Reanimator route refreshes the session via a Route Handler (where writing cookies is legal) and bounces the user back to their origin.
+Executed during state mutations (such as file uploads or database updates) where a user redirect would interrupt the flow and cause permanent loss of input data.
 
-### Cookie Synchronization Pitfalls (Solved)
+- **The Problem**: If a token expires during a file upload in a Server Action, executing a page-level redirect aborts the HTTP connection, discarding the file payload.
+- **The Solution (Direct Commit)**: When `protFetch` is called with `{ isAction: true }`, it intercepts `401 Unauthorized` errors and heals the session in place:
+  1. It triggers `AuthService.refresh()` using the stored refresh token.
+  2. It writes the new tokens directly to the cookie store via `cookies().set()` (which is legal inside Server Actions).
+  3. It automatically re-executes the original network request using the new credentials.
 
-During development, we identified and eliminated several critical scenarios where cookies/sessions could be lost:
+#### Silent Retry Flow:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Browser
+    participant ServerAction as Server Action (protFetch with isAction: true)
+    participant BackendAPI as Backend Resource API (/api/product)
+    participant BackendAuth as Backend Auth API (/api/auth/refresh)
+    
+    Browser->>ServerAction: Submit Form / Trigger Action (Expired Access Token)
+    activate ServerAction
+    ServerAction->>BackendAPI: POST /api/product (Expired Access Token)
+    activate BackendAPI
+    BackendAPI-->>ServerAction: 401 Unauthorized
+    deactivate BackendAPI
+    Note over ServerAction: Silent Retry Detects 401 & isAction: true
+    ServerAction->>BackendAuth: GET /api/auth/refresh (refreshToken)
+    activate BackendAuth
+    BackendAuth-->>ServerAction: 200 OK (Set-Cookie: fresh tokens)
+    deactivate BackendAuth
+    Note over ServerAction: Commit Cookies:<br/>Writes fresh cookies into Next.js cookie store<br/>via cookies().set()
+    ServerAction->>BackendAPI: Re-run original POST /api/product (fresh tokens)
+    activate BackendAPI
+    BackendAPI-->>ServerAction: 200 Success
+    deactivate BackendAPI
+    ServerAction-->>Browser: Success Response + Browser Cookie Store Synced
+    deactivate ServerAction
+```
 
-1. **The "Half-Sync" Failure**: Updating `Set-Cookie` in Middleware but forgetting to update the current Request headers. This causes the immediate Server Component render to fail with 401, even though the session was technically refreshed. *Fixed via Double Sync.*
-2. **The Swallowed Redirect**: Using `try/catch` in Server Actions without re-throwing the redirect error. This prevents Next.js from processing the navigation to the Reanimator route, leading to a silent failure of the entire process. *Fixed via `.digest?.startsWith('NEXT_REDIRECT')` check.*
-3. **The Refresh Storm (Race Condition)**: Multiple concurrent requests hitting an expired session simultaneously. Without de-duplication, each request tries to rotate the token, often leading to backend invalidation of the first successful refresh by subsequent attempts. *Fixed via static `activeRefreshPromise` locking.*
-4. **The Action Interruption**: Triggering a standard redirect during a `POST` operation. This cancels the ongoing data mutation (like a file upload) and redirects the user, causing permanent data loss. *Fixed via in-place Silent Retry.*
+---
 
-### Support for Client Components (`"use client"`)
+### Layer 3: Reanimator Fallback (Server Component Rendering Safety Net)
 
-Due to security standards (`HttpOnly` cookies), the `AuthService` SDK and `protFetch` cannot be executed directly in the browser. To maintain session integrity within client-side logic, use the **API Bridge Pattern**:
+Acts as a fail-safe fallback during Server Component rendering (SSR) if an unauthenticated request somehow gets past the proxy layer or hits a resource-level expiration.
 
-1. **The Bridge**: Create an internal Next.js Route Handler (e.g., `/app/api/proxy/route.ts`).
-2. **The Execution**: Inside the handler, call `AuthService.protFetch(..., { isAction: true })`.
-3. **The Benefit**: The bridge route will automatically handle 401 errors, perform a Silent Retry, and commit new cookies to the browser.
-4. **The Client**: Your `"use client"` component simply calls `fetch('/api/proxy')` and receives data without ever worrying about token expiration.
+- **The Problem**: If a Server Component hits a `401 Unauthorized` while fetching data, it cannot call `cookies().set()` because cookie mutation is strictly forbidden during React rendering.
+- **The Solution (Reanimator Route)**: The network client (`protFetch`) throws a redirect to `/api/auth/refresh-and-return?returnUrl=[CurrentURL]`:
+  1. The route handler `/api/auth/refresh-and-return` is a GET endpoint (where cookie mutations *are* legal).
+  2. It performs the token rotation and commits the updated cookies using `NextResponse`.
+  3. It bounces (redirects) the browser back to the origin `returnUrl`, where the page renders successfully on the second try.
 
-### Critical Technical Pillars
+#### Reanimator Fallback Flow:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Browser
+    participant Proxy as src/proxy.ts (Middleware)
+    participant ServerComp as Server Component (protFetch)
+    participant BackendAPI as Backend Resource API (/api/me)
+    participant Reanimator as Route Handler (/api/auth/refresh-and-return)
+    participant BackendAuth as Backend Auth API (/api/auth/refresh)
+    
+    Browser->>Proxy: GET / (Expired Access Token)
+    Proxy->>ServerComp: Forward (Cookie exists but token is expired)
+    activate ServerComp
+    ServerComp->>BackendAPI: GET /api/me (Expired Access Token)
+    activate BackendAPI
+    BackendAPI-->>ServerComp: 401 Unauthorized
+    deactivate BackendAPI
+    Note over ServerComp: protFetch detects 401 & isAction: false.<br/>Cannot mutate cookies during SSR rendering.
+    ServerComp-->>Browser: Redirect to /api/auth/refresh-and-return?returnUrl=/
+    deactivate ServerComp
+    
+    Browser->>Reanimator: GET /api/auth/refresh-and-return?returnUrl=/
+    activate Reanimator
+    Reanimator->>BackendAuth: GET /api/auth/refresh (refreshToken)
+    activate BackendAuth
+    BackendAuth-->>Reanimator: 200 OK (Set-Cookie: fresh tokens)
+    deactivate BackendAuth
+    Note over Reanimator: Applies Set-Cookie to redirect response
+    Reanimator-->>Browser: Redirect (302) to / with Set-Cookie
+    deactivate Reanimator
+    
+    Browser->>Proxy: GET / (Now has Valid Access Token)
+    Proxy->>ServerComp: Forward Request
+    activate ServerComp
+    ServerComp->>BackendAPI: GET /api/me (Valid Access Token)
+    activate BackendAPI
+    BackendAPI-->>ServerComp: 200 OK (User Profile)
+    deactivate BackendAPI
+    ServerComp-->>Browser: Rendered HTML Page
+    deactivate ServerComp
+```
 
-- **Verified Autonomous Parser**: Since `cookies().set()` requires a structured object but backend returns raw `Set-Cookie` strings, we implemented a custom, performance-verified parser. It perfectly mirrors the internal Next.js/Edge-Runtime logic (verified against 100+ edge cases), ensuring that attributes like `SameSite`, `Max-Age`, and `Partitioned` are handled with system-level precision.
-- **Singleton Promise De-duplication**: To prevent "Refresh Storms", all refresh logic is gated behind a static `activeRefreshPromise`. This ensures only one backend call is made, regardless of request volume.
-- **Zero-Dependency Core**: The entire `AuthService.ts` is self-contained, ensuring long-term stability and immunity to framework or library updates.
+---
 
-### Implementation Guide
+## 🛑 Cookie Synchronization Pitfalls Solved
 
-To use the secure network client, import `protFetch` from the service:
+During development, we resolved four major pitfalls common to Next.js authentication architectures:
+
+1. **The "Half-Sync" Failure**: Triggering a refresh inside Middleware updates the browser (`Set-Cookie` in response), but fails to update the request headers. The immediately following React rendering cycle reads the expired cookies from the incoming request, triggering a 401 error. *Fixed in Layer 1 via Double Sync.*
+2. **The Swallowed Redirect**: Surrounding Server Actions with blind `try/catch` blocks intercepts Next.js's internal routing signals. Since `redirect()` works by throwing a special `NEXT_REDIRECT` error, swallowing it prevents the router from navigating. *Fixed by checking `if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;` in catch blocks.*
+3. **The Refresh Storm**: Concurrent requests hitting an expired session at the same time can cause a race condition, where multiple calls attempt to rotate the same refresh token concurrently. The first rotation invalidates the old token, causing subsequent calls to fail. *Fixed by handling de-duplication on the backend side or via static instance promises.*
+4. **The Action Interruption**: Triggering a standard browser redirect during a `POST` file upload interrupts the upload, causing loss of form state. *Fixed in Layer 2 by running an in-place fetch retry, bypassing redirects entirely.*
+
+---
+
+## 🔗 Client Component Support (The API Bridge Pattern)
+
+Because authentication cookies are marked `HttpOnly` for security, Client Components (`"use client"`) cannot access token strings or initiate raw authentication requests. 
+
+To bridge this gap, Client Components route requests through an internal Next.js Route Handler (acting as a proxy bridge) which delegates to `protFetch` with `isAction: true`:
 
 ```typescript
-import { protFetch } from "@/lib/AuthService";
+// 1. Create a Proxy Bridge Route Handler (src/app/api/proxy/route.ts)
+import { NextRequest, NextResponse } from "next/server";
+import { AuthService } from "@/lib";
 
-// In Server Actions or Route Handlers (Enables Silent Retry)
-// Works for both form submissions and client-side fetch() calls
-const res = await protFetch("/api/data", { method: "POST", isAction: true, body: data });
+export async function POST(req: NextRequest) {
+    const data = await req.json();
+    
+    // Call protFetch with isAction: true. 
+    // If tokens expire, they will be refreshed and committed on the server.
+    const res = await AuthService.protFetch("/api/backend-endpoint", {
+        method: "POST",
+        body: data,
+        isAction: true
+    });
 
-// In Server Components (Enables Reanimator Fallback during SSR)
-const res = await protFetch("/api/profile");
+    if (!res.ok) {
+        return NextResponse.json({ error: "Failed to process request" }, { status: res.status });
+    }
+
+    const payload = await res.json();
+    return NextResponse.json(payload);
+}
 ```
 
-## Learn More
+This bridge allows Client Components to execute requests seamlessly:
+```typescript
+// 2. Execute fetch from Client Component (src/components/MyClientComponent.tsx)
+"use client";
 
-To learn more about Next.js, take a look at the following resources:
+export default function MyClientComponent() {
+    const handleSubmit = async () => {
+        const response = await fetch("/api/proxy", {
+            method: "POST",
+            body: JSON.stringify({ item: "value" }),
+        });
+        const data = await response.json();
+        console.log("Response data:", data);
+    };
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    return <button onClick={handleSubmit}>Send Request</button>;
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🎨 Diagnostic Logs Reference
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The SDK includes a color-coded logging system built with ANSI codes to simplify debugging. In the terminal, look for the following prefixes:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Prefix | Color | Context | Meaning |
+| :--- | :--- | :--- | :--- |
+| `[Proxy]` | **Yellow** | `src/proxy.ts` | Tracks entry, public/private route validation, and routing decisions. |
+| `[AUTH]` | **Green** | `AuthService` | Logged during Double Sync, cookie commits, and middleware validation. |
+| `[FETCH-START]` | **Default** | `AuthService.protFetch` | Logged when a resource request is initiated. Shows the request path and parameters. |
+| `[FETCH-AUTH]` | **Green** | `AuthService.protFetch` | Logged when an in-action token rotation succeeds and retries the call. |
+| `[FETCH-ERROR]` | **Red** | `AuthService.protFetch` | Logged when a request fails with 401 and begins a recovery attempt or redirect. |
+| `[FETCH-FINISH]` | **Default** | `AuthService.protFetch` | Logged upon successful completion of a fetch request, showing HTTP status. |
+| `[REFRESH-START]` | **Green** | `AuthService.refresh` | Logged when the low-level fetch request to the rotation backend begins. |
+| `[REFRESH-ERROR]` | **Red** | `AuthService.refresh` | Logged when the token rotation fails (e.g., timeout, abort, or 401 response). |
+| `[REFRESH-FINISH]` | **Green** | `AuthService.refresh` | Logged when token rotation succeeds, confirming receipt of raw cookies. |
+| `[REANIMATOR-START]` | **Default** | `AuthService.handleRefreshAndReturn` | Logged when the fallback redirect bounce endpoint is hit. |
+| `[REANIMATOR-FINISH]`| **Green** | `AuthService.handleRefreshAndReturn` | Logged when the fallback endpoint completes rotation and redirects back. |
+| `[REANIMATOR-ERROR]` | **Red** | `AuthService.handleRefreshAndReturn` | Logged when the fallback endpoint fails to rotate tokens and forces a logout. |
+| `[SignInAction]` | **Magenta** | `src/app/sign-in/actions.ts` | Tracks credentials validation and initial session commits. |
+| `[SignOut]` | **Red** | `src/app/api/auth/sign-out/route.ts` | Tracks session destruction and redirect to the sign-in page. |
+
+---
+
+## 🚀 Execution & Verification
+
+### Running the Dev Server
+Launch Turbopack in development mode:
+```bash
+npm run dev
+```
+
+### Running Unit Tests
+The unit test suite runs natively in Node.js, stripping typescript annotations instantly using `tsx`. It requires zero testing dependencies (like Vitest or Jest):
+```bash
+npm run test
+```
+
+### Building for Production
+Verify hydration, compiling, and type safety:
+```bash
+npm run build
+```

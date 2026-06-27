@@ -1,9 +1,8 @@
 "use server";
 
-import {cookies} from "next/headers";
-import {parseSetCookie} from "set-cookie-parser";
 import {redirect} from "next/navigation";
 import {API_URL} from "@/config";
+import {AuthService} from "@/lib";
 import {createLogger} from "@/lib/logger";
 
 const log = createLogger('SignInAction', 'magenta');
@@ -26,17 +25,10 @@ export async function signInAction(_: any, formData: FormData) {
             return {error: "Неверный email или пароль"};
         }
 
-        const headerCookies = res.headers.getSetCookie()
-        const cookieStore = await cookies();
-        if (headerCookies) {
+        const headerCookies = res.headers.getSetCookie();
+        if (headerCookies.length > 0) {
             log(`[AUTH]: (${email}) ->`, "Committing session cookies");
-            const parsedCookies = parseSetCookie(headerCookies);
-
-            for (const {name, value, ...options} of parsedCookies) {
-                if (name) {
-                    cookieStore.set(name, value, options as any);
-                }
-            }
+            await AuthService.commitCookies(headerCookies);
         }
 
         log(`[FINISH]: (${email}) ->`, "Success, redirecting to home");
