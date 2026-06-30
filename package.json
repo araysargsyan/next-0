@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/auth/__tests__/AuthService.test.ts"
+    "test": "npx tsx --test \"src/**/*.test.ts\" \"src/**/*.spec.ts\""
   },
   "dependencies": {
     "next": "16.2.9",

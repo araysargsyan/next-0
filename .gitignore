@@ -41,8 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # project specific
-/for-gemini/
+/for-ai/
 /.idea/
-/backup_tokens/
 /collaboration-rules.md
 

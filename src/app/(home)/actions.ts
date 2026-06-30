@@ -7,7 +7,7 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger('UploadAction', 'magenta');
 
-export async function uploadImagesAction(prevState: any, formData: FormData) {
+export async function uploadImagesAction(_prevState: unknown, formData: FormData) {
     const name = formData.get("name") as string;
     log(`[START]: (${name || 'unknown'})`, "Processing image upload...");
 
@@ -50,8 +50,10 @@ export async function uploadImagesAction(prevState: any, formData: FormData) {
 
         revalidatePath("/"); // Revalidate the page to reflect the new upload
         return { success: true, data: apiResponseData };
-    } catch (e: any) {
-        if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
+    } catch (e) {
+        if (e && typeof e === 'object' && 'digest' in e && typeof (e as { digest: string }).digest === 'string') {
+            if ((e as { digest: string }).digest.startsWith('NEXT_REDIRECT')) throw e;
+        }
 
         log(`[ERROR]: (${name || 'unknown'}) ->`, "Critical failure", String(e));
         return { error: "Internal server error" };

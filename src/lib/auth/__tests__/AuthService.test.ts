@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { AuthService } from '../AuthService.ts';
+import { AuthService } from '../AuthService';
 
 // ==========================================
 // 1. Next.js Mock Setup for Server Modules
@@ -39,7 +39,6 @@ class MockNextRequest {
 
 class MockNextResponse {
     public headers = new Headers();
-    public status = 200;
     public url?: string;
     public type: 'next' | 'redirect';
     public requestHeaders?: Headers;
@@ -62,10 +61,11 @@ class MockNextResponse {
 // Monkey-patch next/server dynamically if running inside Next environment,
 // otherwise relies entirely on constructor dependency injection.
 try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const nextServer = require('next/server');
     nextServer.NextRequest = MockNextRequest;
     nextServer.NextResponse = MockNextResponse;
-} catch (e) {
+} catch (_e) {
     // Fallback if CommonJS next modules cannot be resolved/mutated
 }
 

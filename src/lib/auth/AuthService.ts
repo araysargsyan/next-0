@@ -160,7 +160,6 @@ export class AuthService {
     async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse> {
         const { searchParams } = new URL(req.url);
         const returnUrl = searchParams.get('returnUrl') || "/";
-        console.log(666, returnUrl)
 
         log(`[REANIMATOR-START]: (${returnUrl})`, "Re-authenticating and returning");
 

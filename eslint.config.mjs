@@ -8,13 +8,25 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "@typescript-eslint/no-unused-vars": [
-        "warn", // or "error" if you want the project to fail compilation on errors
+        "error",
         {
+          "args": "all",
           "argsIgnorePattern": "^_",
           "varsIgnorePattern": "^_",
           "caughtErrorsIgnorePattern": "^_"
         }
-      ]
+      ],
+      "@typescript-eslint/no-explicit-any": "error" // Disallow 'any' everywhere by default
+    }
+  },
+  {
+    // Override for test files to allow 'any'
+    files: [
+      "**/__tests__/**/*.[jt]s?(x)",
+      "**/?(*.)+(spec|test).[jt]s?(x)"
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off"
     }
   },
   // Override default ignores of eslint-config-next.

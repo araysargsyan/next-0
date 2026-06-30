@@ -7,7 +7,7 @@ import {createLogger} from "@/lib/logger";
 
 const log = createLogger('SignInAction', 'magenta');
 
-export async function signInAction(_: any, formData: FormData) {
+export async function signInAction(_: unknown, formData: FormData) {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
@@ -34,8 +34,10 @@ export async function signInAction(_: any, formData: FormData) {
         log(`[FINISH]: (${email}) ->`, "Success, redirecting to home");
         // redirect('/') must be outside try/catch or handled carefully, 
         // but Next.js 15+ handles it in Server Actions.
-    } catch (e: any) {
-        if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
+    } catch (e) {
+        if (e && typeof e === 'object' && 'digest' in e && typeof (e as { digest: string }).digest === 'string') {
+            if ((e as { digest: string }).digest.startsWith('NEXT_REDIRECT')) throw e;
+        }
         log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
         return {error: "Internal server error"};
     }
