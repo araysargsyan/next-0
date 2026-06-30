@@ -13,7 +13,7 @@ At the center of this project is the **`AuthService` SDK**, a custom-built, depe
 - **Bundler**: Turbopack (default for dev and builds).
 - **Network Boundary**: `src/proxy.ts` (replaces deprecated `middleware.ts`). Runs on the **full Node.js Runtime**, enabling the use of native Node modules and arbitrary npm packages.
 - **Styling**: TailwindCSS v4 with PostCSS.
-- **Testing**: Node.js native test runner (`node:test`) and assertion engine (`node:assert`).
+- **Testing**: Jest with Next.js SWC compiler integration.
 
 ---
 
@@ -200,7 +200,7 @@ To bridge this gap, Client Components route requests through an internal Next.js
 ```typescript
 // 1. Create a Proxy Bridge Route Handler (src/app/api/proxy/route.ts)
 import { NextRequest, NextResponse } from "next/server";
-import { AuthService } from "@/lib";
+import { AuthService } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
     const data = await req.json();
@@ -275,9 +275,15 @@ npm run dev
 ```
 
 ### Running Unit Tests
-The unit test suite runs natively in Node.js, stripping typescript annotations instantly using `tsx`. It requires zero testing dependencies (like Vitest or Jest):
+The unit test suite runs on Jest, using the Next.js SWC compiler to compile TypeScript on the fly:
 ```bash
 npm run test
+```
+
+### Running TypeScript Type Checks
+Verify all type safety and compile-time correctness across the codebase:
+```bash
+npm run type-check
 ```
 
 ### Building for Production
