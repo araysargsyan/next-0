@@ -8,7 +8,7 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "@typescript-eslint/no-unused-vars": [
-        "warn", // или "error", если хочешь, чтобы проект не собирался при ошибках
+        "warn", // or "error" if you want the project to fail compilation on errors
         {
           "argsIgnorePattern": "^_",
           "varsIgnorePattern": "^_",

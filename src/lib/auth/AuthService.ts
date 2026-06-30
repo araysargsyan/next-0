@@ -44,6 +44,7 @@ export class AuthService {
         const refreshToken = req.cookies.get(refreshTokenName)?.value;
 
         const requestHeaders = new Headers(req.headers);
+        requestHeaders.set("x-url", req.url); // Save the exact requested URL
         let rawSetCookies: string[] = [];
         let isRefreshed = false;
 
@@ -122,10 +123,10 @@ export class AuthService {
                 const refreshToken = cookieStore.get(refreshTokenName)?.value;
                 if (!refreshToken) {
                     log(`[FETCH-ERROR]: (${path}) ->`, 'No refresh token available, redirecting to sign-out');
-                    this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    return this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
                 }
 
-                const refresh = await this.refresh(refreshToken!);
+                const refresh = await this.refresh(refreshToken, path);
 
                 if (refresh.success) {
                     log(`[FETCH-AUTH]: (${path}) ->`, 'Refresh successful, committing cookies and retrying');
@@ -136,11 +137,16 @@ export class AuthService {
                     return res;
                 } else {
                     log(`[FETCH-ERROR]: (${path}) ->`, 'Refresh failed in Action, redirecting to sign-out');
-                    this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    return this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
                 }
             } else {
                 log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized, redirecting to refresh route');
-                this.deps.redirect(this.config.routes.refreshAndReturn);
+                const headersStore = await this.deps.headers();
+                const currentUrl = headersStore.get('x-url') || '';
+                const returnUrl = currentUrl
+                    ? `${this.config.routes.refreshAndReturn}?returnUrl=${encodeURIComponent(currentUrl)}`
+                    : this.config.routes.refreshAndReturn;
+                return this.deps.redirect(returnUrl);
             }
         }
 
@@ -152,7 +158,9 @@ export class AuthService {
      * REANIMATOR: Handles the GET request on /api/auth/refresh-and-return.
      */
     async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse> {
-        const returnUrl = req.headers.get('referer') || "/";
+        const { searchParams } = new URL(req.url);
+        const returnUrl = searchParams.get('returnUrl') || "/";
+        console.log(666, returnUrl)
 
         log(`[REANIMATOR-START]: (${returnUrl})`, "Re-authenticating and returning");
 

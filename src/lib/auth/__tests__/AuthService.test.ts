@@ -413,18 +413,21 @@ describe('AuthService Suite', () => {
 
         it('4.4 should redirect to reanimator route in Server Component context (isAction: false) on 401', async () => {
             mockCookies.set('access_tok', 'expired_access');
+            mockHeaders.set('x-url', 'http://localhost:3000/some-page');
 
             fetchSpy.mock.mockImplementation(async () => {
                 return new Response(null, { status: 401 });
             });
 
+            const expectedRedirectTarget = '/refresh-bounce?returnUrl=' + encodeURIComponent('http://localhost:3000/some-page');
+
             await assert.rejects(
                 async () => { await service.protFetch('/api/data-url'); },
-                (err: Error) => err.message === 'REDIRECT_THROWN: /refresh-bounce'
+                (err: Error) => err.message === `REDIRECT_THROWN: ${expectedRedirectTarget}`
             );
 
             assert.strictEqual(redirectSpy.mock.callCount(), 1);
-            assert.strictEqual(redirectSpy.mock.calls[0].arguments[0], '/refresh-bounce');
+            assert.strictEqual(redirectSpy.mock.calls[0].arguments[0], expectedRedirectTarget);
         });
 
         it('4.5 should skip refresh and redirect immediately to sign-out in Action context on 401 if refresh token is missing', async () => {
@@ -449,12 +452,10 @@ describe('AuthService Suite', () => {
     // Suite 5: Reanimator Handler
     // ==========================================
     describe('Suite 5: Reanimator Handler', () => {
-        it('5.1 should redirect back to referer with cookie headers on successful refresh', async () => {
+        it('5.1 should redirect back to returnUrl with cookie headers on successful refresh', async () => {
             mockCookies.set('refresh_tok', 'active_refresh');
 
-            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return', {
-                headers: { referer: 'http://localhost:3000/dashboard' }
-            }) as any;
+            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return?returnUrl=%2Fdashboard') as any;
 
             fetchSpy.mock.mockImplementation(async () => {
                 const headers = new Headers();
@@ -476,9 +477,7 @@ describe('AuthService Suite', () => {
         it('5.2 should redirect to sign-out if refresh fails inside reanimator', async () => {
             mockCookies.set('refresh_tok', 'dead_refresh');
 
-            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return', {
-                headers: { referer: 'http://localhost:3000/dashboard' }
-            }) as any;
+            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return?returnUrl=%2Fdashboard') as any;
 
             fetchSpy.mock.mockImplementation(async () => {
                 return new Response(null, { status: 400 });

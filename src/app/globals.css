@@ -29,5 +29,5 @@ body {
 }
 
 /*html, body {*/
-/*  overflow-x: hidden; !* Это часто вызывает прыжки при появлении скролла *!*/
+/*  overflow-x: hidden; !* This often causes layout jumps when the scrollbar appears *!*/
 /*}*/

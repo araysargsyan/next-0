@@ -44,3 +44,5 @@ next-env.d.ts
 /for-gemini/
 /.idea/
 /backup_tokens/
+/collaboration-rules.md
+

@@ -11,10 +11,10 @@ export default async function Home() {
 
   if (!res.ok) {
     log("[ERROR]: Failed to load profile", { status: res.status });
-      return <div>
-          <h1>Home</h1>
-          <div>Failed to load profile</div>
-      </div>;
+    return <div>
+        <h1>About</h1>
+        <div>Failed to load profile</div>
+    </div>;
   }
 
   const user = await res.json();
@@ -22,7 +22,7 @@ export default async function Home() {
 
   return (
       <div style={{ padding: "20px" }}>
-          <h1>Home (v1)</h1>
+          <h1>About</h1>
           <p>Welcome, {user.name}!</p>
 
           <ImageUploadForm />

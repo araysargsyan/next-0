@@ -14,7 +14,7 @@ export default async function proxy(req: NextRequest) {
 
     log(`[START]: (${pathname})`, {hasAT: !!accessToken, hasRT: !!refreshToken});
 
-    // 1. Публичные маршруты
+    // 1. Public routes
     if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
         if (pathname === '/sign-in' && refreshToken) {
             log(`[FINISH]: (${pathname}) ->`, 'Redirect to home (already authenticated)');
@@ -24,13 +24,13 @@ export default async function proxy(req: NextRequest) {
         return NextResponse.next();
     }
 
-    // 2. Если нет вообще никаких токенов — на вход
+    // 2. If no tokens are present — redirect to sign-in
     if (!refreshToken && !accessToken) {
         log(`[FINISH]: (${pathname}) ->`, 'No tokens, redirect to sign-in');
         return NextResponse.redirect(new URL("/sign-in", req.url));
     }
 
-    // 3. ГЛОБАЛЬНАЯ МАГИЯ v4 (Proactive Refresh & Double Sync)
+    // 3. GLOBAL MAGIC v4 (Proactive Refresh & Double Sync)
     const { response, isRefreshed } = await AuthService.getAuthorizedResponse(req);
 
     log(`[FINISH]: (${pathname}) ->`, { refreshed: isRefreshed });
