@@ -2,7 +2,7 @@
 
 import {redirect} from "next/navigation";
 import {API_URL} from "@/config";
-import {AuthService} from "@/lib";
+import {AuthService} from "@/lib/auth";
 import {createLogger} from "@/lib/logger";
 
 const log = createLogger('SignInAction', 'magenta');

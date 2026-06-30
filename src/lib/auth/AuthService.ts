@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createLogger } from "./logger";
+import { createLogger } from "../logger";
 
 const log = createLogger('AuthService', 'green');
 
@@ -138,10 +138,10 @@ export class AuthService {
     /**
      * ПРОДВИНУТЫЙ FETCH: Автоматически обрабатывает 401 и делает Silent Retry в экшенах.
      */
-    async protFetch<TBody = unknown>(
+    protFetch = async <TBody = unknown>(
         path: string,
         options: Omit<RequestInit, "body"> & { body?: TBody, isAction?: boolean } = {}
-    ): Promise<Response> {
+    ): Promise<Response> => {
         const { method = "GET", body, isAction = false, ...fetchOptions } = options;
         log(`[FETCH-START]: (${path})`, { method, isAction });
 

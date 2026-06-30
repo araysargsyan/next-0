@@ -1,6 +1,6 @@
 "use server";
 
-import { protFetch } from "@/lib";
+import { protFetch } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 import { createLogger } from "@/lib/logger";
