@@ -28,7 +28,6 @@ Instantiate the SDK with the following configuration options:
 ```typescript
 export interface AuthSDKConfig {
     apiUrl: string;             // The backend auth server base URL (e.g., http://localhost:4400)
-    baseUrl: string;            // The frontend public origin (e.g., http://localhost:3000)
     cookieNames?: {
         accessToken?: string;   // Cookie key for the access token (Default: "accessToken")
         refreshToken?: string;  // Cookie key for the refresh token (Default: "refreshToken")
@@ -59,18 +58,17 @@ Create a unified entry point (typically `src/lib/index.ts`) to configure and exp
 
 ```typescript
 import { AuthService as AuthServiceClass } from "./AuthService";
-import { API_URL, BASE_URL } from "@/config";
+import { API_URL } from "@/config";
 
 // Singleton AuthService configuration
 export const AuthService = new AuthServiceClass({
     apiUrl: API_URL,
-    baseUrl: BASE_URL,
 });
 
 // Export bound method for easy import and cleaner calls
-export const protFetch = AuthService.protFetch.bind(AuthService);
+export const protFetch = AuthService.protFetch;
 
-export type { ParsedCookie, AuthSDKConfig, AuthDependencies, TRefreshResponse } from "./AuthService";
+export type { ParsedCookie, AuthSDKConfig, AuthDependencies, RefreshResponse } from "./types";
 export { AuthServiceClass };
 ```
 
@@ -142,11 +140,11 @@ export { AuthServiceClass };
 The low-level refresh handler calls the backend authentication endpoint (`/api/auth/refresh`) using the HTTP `Cookie` header. It wraps the execution with an `AbortSignal.timeout` to prevent connection hangs.
 
 ```typescript
-async refresh(contextPath: string, refreshToken: string, reqUrl?: string): Promise<TRefreshResponse>
+async refresh(refreshToken: string, logPath: string = ''): Promise<RefreshResponse>
 ```
 
 - **Successful Response**: Returns `{ success: true, cookieString: string, rawSetCookies: string[] }`.
-- **Failed Response**: Returns `{ success: false, errorRedirect: NextResponse }` pointing to the configured sign-out route, terminating the session.
+- **Failed Response**: Returns `{ success: false }` indicating the session refresh failed.
 
 ---
 
