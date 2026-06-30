@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createLogger } from "../logger";
-import {AuthDependencies, AuthSDKConfig, ParsedCookie, RefreshResponse} from "./types";
+import { AuthSDKConfig, ParsedCookie, RefreshResponse } from "./types";
 
 
 const log = createLogger('AuthService', 'green');
 
 export class AuthService {
     private readonly config: DeepRequired<AuthSDKConfig>;
-    private readonly deps: Required<AuthDependencies>;
 
-    constructor(config: AuthSDKConfig, deps: AuthDependencies = {}) {
+    constructor(config: AuthSDKConfig) {
         this.config = {
             apiUrl: config.apiUrl,
             cookieNames: {
@@ -23,12 +22,6 @@ export class AuthService {
                 refreshAndReturn: config.routes?.refreshAndReturn || "/api/auth/refresh-and-return",
             },
             timeoutMs: config.timeoutMs ?? 5000,
-        };
-
-        this.deps = {
-            cookies: deps.cookies || cookies,
-            headers: deps.headers || headers,
-            redirect: deps.redirect || redirect,
         };
     }
 
@@ -94,7 +87,7 @@ export class AuthService {
         const { method = "GET", body, isAction = false, ...fetchOptions } = options;
         log(`[FETCH-START]: (${path})`, { method, isAction });
 
-        const cookieStore = await this.deps.cookies();
+        const cookieStore = await cookies();
         const refreshTokenName = this.config.cookieNames.refreshToken;
 
         const getHeaders = () => {
@@ -123,7 +116,7 @@ export class AuthService {
                 const refreshToken = cookieStore.get(refreshTokenName)?.value;
                 if (!refreshToken) {
                     log(`[FETCH-ERROR]: (${path}) ->`, 'No refresh token available, redirecting to sign-out');
-                    return this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    return redirect(`${this.config.routes.signOut}?error=session_expired`);
                 }
 
                 const refresh = await this.refresh(refreshToken, path);
@@ -137,16 +130,16 @@ export class AuthService {
                     return res;
                 } else {
                     log(`[FETCH-ERROR]: (${path}) ->`, 'Refresh failed in Action, redirecting to sign-out');
-                    return this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    return redirect(`${this.config.routes.signOut}?error=session_expired`);
                 }
             } else {
                 log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized, redirecting to refresh route');
-                const headersStore = await this.deps.headers();
+                const headersStore = await headers();
                 const currentUrl = headersStore.get('x-url') || '';
                 const returnUrl = currentUrl
                     ? `${this.config.routes.refreshAndReturn}?returnUrl=${encodeURIComponent(currentUrl)}`
                     : this.config.routes.refreshAndReturn;
-                return this.deps.redirect(returnUrl);
+                return redirect(returnUrl);
             }
         }
 
@@ -163,7 +156,7 @@ export class AuthService {
 
         log(`[REANIMATOR-START]: (${returnUrl})`, "Re-authenticating and returning");
 
-        const cookieStore = await this.deps.cookies();
+        const cookieStore = await cookies();
         const refreshTokenName = this.config.cookieNames.refreshToken;
         const refreshToken = cookieStore.get(refreshTokenName)?.value;
 
@@ -243,7 +236,7 @@ export class AuthService {
      * Commits parsed cookies into the Next.js cookie store (for Actions / Route Handlers).
      */
     async commitCookies(rawSetCookies: string[]): Promise<void> {
-        const cookieStore = await this.deps.cookies();
+        const cookieStore = await cookies();
         rawSetCookies.forEach(cookieStr => {
             const parsed = this.parseSetCookie(cookieStr);
             if (parsed) {

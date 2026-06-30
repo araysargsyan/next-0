@@ -1,9 +1,7 @@
 import {NextRequest, NextResponse} from "next/server";
 import {AuthService} from "@/lib/auth";
-import {COOKIE_NAMES} from "@/config";
+import {COOKIE_NAMES, PUBLIC_ROUTES} from "@/config";
 import {createLogger} from "@/lib/logger";
-
-const PUBLIC_ROUTES = ["/sign-in"];
 
 const log = createLogger('Proxy', 'yellow');
 

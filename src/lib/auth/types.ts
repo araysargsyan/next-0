@@ -1,5 +1,3 @@
-import {cookies, headers} from "next/headers";
-import { redirect } from "next/navigation";
 
 type RefreshResponse =
     | {
@@ -38,10 +36,4 @@ interface AuthSDKConfig {
     timeoutMs?: number;
 }
 
-interface AuthDependencies {
-    cookies?: typeof cookies;
-    headers?: typeof headers;
-    redirect?: typeof redirect;
-}
-
-export type {RefreshResponse, ParsedCookie, AuthSDKConfig, AuthDependencies};
+export type {RefreshResponse, ParsedCookie, AuthSDKConfig};

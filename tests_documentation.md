@@ -11,7 +11,7 @@ These are **Unit Tests**.
 They focus on verifying the core logic, state transformations, and edge cases of the `AuthService` engine in complete isolation:
 - **No Backend Connection**: All API requests to the backend server are mocked.
 - **No Browser/Next.js Runtime Requirement**: Next.js framework APIs (`cookies()`, `headers()`, `redirect()`, `NextRequest`, `NextResponse`) are stubbed out via **Dependency Inversion**.
-- **In-Memory & Fast**: The entire 20-test suite runs in less than **60 milliseconds**.
+- **In-Memory & Fast**: The entire 21-test suite runs in less than **60 milliseconds**.
 
 ---
 
@@ -28,7 +28,7 @@ Rather than mocking the `AuthService` itself (which can hide logic bugs), we tes
 
 ## 📋 Test Scenarios Breakdown
 
-The suite consists of **20 test cases** organized into **5 functional suites**:
+The suite consists of **21 test cases** organized into **5 functional suites**:
 
 ### Suite 1: Cookie Parser & Commit (`parseSetCookie`, `commitCookies`)
 Tests the parsing of backend `Set-Cookie` header strings into structured JavaScript objects.
@@ -57,6 +57,7 @@ Tests pre-emptive session recovery inside Next.js Middleware.
     - **Response headers** are appended (so the browser saves them).
     - Returns `isRefreshed: true`.
 *   **3.4 Double Sync Refresh Failure**: Asserts that if refresh fails in middleware, it redirects immediately to the sign-out route.
+*   **3.5 x-url Header Injection**: Asserts that `getAuthorizedResponse` injects the `x-url` header containing the current requested URL into the request headers.
 
 ### Suite 4: Smart HTTP Client / Silent Retry (`protFetch`)
 Tests client calls made inside Server Actions, Route Handlers, and Server Components.
@@ -90,6 +91,6 @@ npm run test
 
 *Under the hood, this executes:*
 ```bash
-npx tsx --test src/lib/__tests__/AuthService.test.ts
+npx tsx --test src/lib/auth/__tests__/AuthService.test.ts
 ```
 *(Uses lightweight TS execution to strip typings and pass them straight to Node's built-in testing library).*
