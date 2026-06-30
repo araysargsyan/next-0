@@ -1,5 +1,6 @@
 import {NextRequest, NextResponse} from "next/server";
 import {AuthService} from "@/lib/auth";
+import {COOKIE_NAMES} from "@/config";
 import {createLogger} from "@/lib/logger";
 
 const PUBLIC_ROUTES = ["/sign-in"];
@@ -8,8 +9,8 @@ const log = createLogger('Proxy', 'yellow');
 
 export default async function proxy(req: NextRequest) {
     const {pathname} = req.nextUrl;
-    const accessToken = req.cookies.get("accessToken")?.value;
-    const refreshToken = req.cookies.get("refreshToken")?.value;
+    const accessToken = req.cookies.get(COOKIE_NAMES.accessToken)?.value;
+    const refreshToken = req.cookies.get(COOKIE_NAMES.refreshToken)?.value;
 
     log(`[START]: (${pathname})`, {hasAT: !!accessToken, hasRT: !!refreshToken});
 

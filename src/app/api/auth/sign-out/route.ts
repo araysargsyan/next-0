@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import {createLogger} from "@/lib/logger";
+import {COOKIE_NAMES} from "@/config";
 
 const log = createLogger('SignOut', 'red');
 
@@ -13,8 +14,8 @@ export async function GET(req: NextRequest) {
     const cookieStore = await cookies();
 
     // 1. Clear the session
-    cookieStore.delete("accessToken");
-    cookieStore.delete("refreshToken");
+    cookieStore.delete(COOKIE_NAMES.accessToken);
+    cookieStore.delete(COOKIE_NAMES.refreshToken);
 
     // 2. Build the sign-in redirect URL
     const signInUrl = new URL("/sign-in", req.url);

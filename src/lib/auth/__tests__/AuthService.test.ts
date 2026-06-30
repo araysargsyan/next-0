@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { AuthService, TRefreshResponse, ParsedCookie } from '../AuthService.ts';
+import { AuthService } from '../AuthService.ts';
 
 // ==========================================
 // 1. Next.js Mock Setup for Server Modules
@@ -117,7 +117,6 @@ describe('AuthService Suite', () => {
 
     const mockConfig = {
         apiUrl: 'http://backend:4400',
-        baseUrl: 'http://localhost:3000',
         cookieNames: {
             accessToken: 'access_tok',
             refreshToken: 'refresh_tok',
@@ -220,7 +219,7 @@ describe('AuthService Suite', () => {
                 return new Response(null, { status: 200, headers });
             });
 
-            const result = await service.refresh('/dashboard', 'old_refresh_token');
+            const result = await service.refresh('old_refresh_token', '/dashboard');
 
             assert.strictEqual(fetchSpy.mock.callCount(), 1);
             const callArgs = fetchSpy.mock.calls[0].arguments;
@@ -234,33 +233,24 @@ describe('AuthService Suite', () => {
             }
         });
 
-        it('2.2 should return failure and redirect response if backend returns 200 but no Set-Cookie headers', async () => {
+        it('2.2 should return failure if backend returns 200 but no Set-Cookie headers', async () => {
             fetchSpy.mock.mockImplementation(async () => {
                 return new Response(null, { status: 200 });
             });
 
-            const result = await service.refresh('/dashboard', 'old_refresh');
+            const result = await service.refresh('old_refresh', '/dashboard');
 
             assert.strictEqual(result.success, false);
-            if (!result.success) {
-                assert.ok(result.errorRedirect !== undefined);
-                assert.strictEqual((result.errorRedirect as any).type, 'redirect');
-                assert.ok((result.errorRedirect as any).url.includes('/logout?error=session_expired'));
-            }
         });
 
-        it('2.3 should return failure and redirect response if backend rejects refresh (e.g., 401)', async () => {
+        it('2.3 should return failure if backend rejects refresh (e.g., 401)', async () => {
             fetchSpy.mock.mockImplementation(async () => {
                 return new Response(null, { status: 401 });
             });
 
-            const result = await service.refresh('/dashboard', 'invalid_refresh');
+            const result = await service.refresh('invalid_refresh', '/dashboard');
 
             assert.strictEqual(result.success, false);
-            if (!result.success) {
-                assert.strictEqual((result.errorRedirect as any).type, 'redirect');
-                assert.ok((result.errorRedirect as any).url.includes('/logout?error=session_expired'));
-            }
         });
 
         it('2.4 should return failure and handle timeout abort cleanly', async () => {
@@ -268,12 +258,9 @@ describe('AuthService Suite', () => {
                 throw new DOMException('The user aborted a request.', 'AbortError');
             });
 
-            const result = await service.refresh('/dashboard', 'refresh_token');
+            const result = await service.refresh('refresh_token', '/dashboard');
 
             assert.strictEqual(result.success, false);
-            if (!result.success) {
-                assert.ok(result.errorRedirect !== undefined);
-            }
         });
     });
 
@@ -426,21 +413,18 @@ describe('AuthService Suite', () => {
 
         it('4.4 should redirect to reanimator route in Server Component context (isAction: false) on 401', async () => {
             mockCookies.set('access_tok', 'expired_access');
-            mockHeaders.set('referer', 'http://localhost:3000/some-page');
 
             fetchSpy.mock.mockImplementation(async () => {
                 return new Response(null, { status: 401 });
             });
 
-            const expectedRedirectTarget = '/refresh-bounce?returnUrl=' + encodeURIComponent('http://localhost:3000/some-page');
-
             await assert.rejects(
                 async () => { await service.protFetch('/api/data-url'); },
-                (err: Error) => err.message === `REDIRECT_THROWN: ${expectedRedirectTarget}`
+                (err: Error) => err.message === 'REDIRECT_THROWN: /refresh-bounce'
             );
 
             assert.strictEqual(redirectSpy.mock.callCount(), 1);
-            assert.strictEqual(redirectSpy.mock.calls[0].arguments[0], expectedRedirectTarget);
+            assert.strictEqual(redirectSpy.mock.calls[0].arguments[0], '/refresh-bounce');
         });
 
         it('4.5 should skip refresh and redirect immediately to sign-out in Action context on 401 if refresh token is missing', async () => {
@@ -465,10 +449,12 @@ describe('AuthService Suite', () => {
     // Suite 5: Reanimator Handler
     // ==========================================
     describe('Suite 5: Reanimator Handler', () => {
-        it('5.1 should redirect back to returnUrl with cookie headers on successful refresh', async () => {
+        it('5.1 should redirect back to referer with cookie headers on successful refresh', async () => {
             mockCookies.set('refresh_tok', 'active_refresh');
 
-            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return?returnUrl=%2Fdashboard') as any;
+            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return', {
+                headers: { referer: 'http://localhost:3000/dashboard' }
+            }) as any;
 
             fetchSpy.mock.mockImplementation(async () => {
                 const headers = new Headers();
@@ -487,10 +473,12 @@ describe('AuthService Suite', () => {
             assert.ok(cookiesHeader.includes('refresh_tok=new_refresh; Path=/'));
         });
 
-        it('5.2 should forward redirect rejection if refresh fails inside reanimator', async () => {
+        it('5.2 should redirect to sign-out if refresh fails inside reanimator', async () => {
             mockCookies.set('refresh_tok', 'dead_refresh');
 
-            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return?returnUrl=%2Fdashboard') as any;
+            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return', {
+                headers: { referer: 'http://localhost:3000/dashboard' }
+            }) as any;
 
             fetchSpy.mock.mockImplementation(async () => {
                 return new Response(null, { status: 400 });
@@ -503,7 +491,7 @@ describe('AuthService Suite', () => {
         });
 
         it('5.3 should redirect to sign-out immediately if refresh token is missing in cookie store', async () => {
-            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return?returnUrl=%2Fdashboard') as any;
+            const req = new MockNextRequest('http://localhost:3000/api/auth/refresh-and-return') as any;
 
             const res = await service.handleRefreshAndReturn(req);
 

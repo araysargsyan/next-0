@@ -2,76 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createLogger } from "../logger";
+import {AuthDependencies, AuthSDKConfig, ParsedCookie, RefreshResponse} from "./types";
+
 
 const log = createLogger('AuthService', 'green');
 
-export type TRefreshResponse =
-    | {
-        success: true;
-        cookieString: string;
-        rawSetCookies: string[];
-    }
-    | {
-        success: false;
-        errorRedirect: NextResponse;
-    };
-
-export interface ParsedCookie {
-    name: string;
-    value: string;
-    domain?: string;
-    expires?: Date;
-    httpOnly?: boolean;
-    maxAge?: number;
-    path?: string;
-    sameSite?: 'lax' | 'strict' | 'none';
-    secure?: boolean;
-    priority?: 'low' | 'medium' | 'high';
-    partitioned?: boolean;
-}
-
-export interface AuthSDKConfig {
-    apiUrl: string;
-    baseUrl: string;
-    cookieNames?: {
-        accessToken?: string;
-        refreshToken?: string;
-    };
-    routes?: {
-        signOut?: string;
-        refreshAndReturn?: string;
-    };
-    timeoutMs?: number;
-}
-
-export interface AuthDependencies {
-    cookies?: typeof cookies;
-    headers?: typeof headers;
-    redirect?: typeof redirect;
-}
-
-export interface InternalAuthConfig {
-    apiUrl: string;
-    baseUrl: string;
-    cookieNames: {
-        accessToken: string;
-        refreshToken: string;
-    };
-    routes: {
-        signOut: string;
-        refreshAndReturn: string;
-    };
-    timeoutMs: number;
-}
-
 export class AuthService {
-    private readonly config: InternalAuthConfig;
+    private readonly config: DeepRequired<AuthSDKConfig>;
     private readonly deps: Required<AuthDependencies>;
 
     constructor(config: AuthSDKConfig, deps: AuthDependencies = {}) {
         this.config = {
             apiUrl: config.apiUrl,
-            baseUrl: config.baseUrl,
             cookieNames: {
                 accessToken: config.cookieNames?.accessToken || "accessToken",
                 refreshToken: config.cookieNames?.refreshToken || "refreshToken",
@@ -108,7 +50,7 @@ export class AuthService {
         if (!accessToken && refreshToken) {
             log(`[AUTH]: (${pathname}) ->`, 'Access token missing. Attempting refresh...');
 
-            const refresh = await this.refresh(pathname, refreshToken, req.url);
+            const refresh = await this.refresh(refreshToken, pathname);
 
             if (refresh.success) {
                 log(`[AUTH]: (${pathname}) ->`, 'Refresh successful. Performing Double Sync.');
@@ -117,7 +59,13 @@ export class AuthService {
                 isRefreshed = true;
             } else {
                 log(`[FINISH]: (${pathname}) ->`, 'Refresh failed, forwarding to sign-out');
-                return { response: refresh.errorRedirect, isRefreshed: false };
+                return {
+                    isRefreshed: false,
+                    response: NextResponse.redirect(new URL(
+                        `${this.config.routes.signOut}?error=session_expired`,
+                        req.url
+                    )),
+                };
             }
         }
 
@@ -146,8 +94,6 @@ export class AuthService {
         log(`[FETCH-START]: (${path})`, { method, isAction });
 
         const cookieStore = await this.deps.cookies();
-        const headersList = await this.deps.headers();
-        const currentUrl = headersList.get('referer') || this.config.baseUrl;
         const refreshTokenName = this.config.cookieNames.refreshToken;
 
         const getHeaders = () => {
@@ -179,7 +125,7 @@ export class AuthService {
                     this.deps.redirect(`${this.config.routes.signOut}?error=session_expired`);
                 }
 
-                const refresh = await this.refresh("", refreshToken, this.config.baseUrl);
+                const refresh = await this.refresh(refreshToken!);
 
                 if (refresh.success) {
                     log(`[FETCH-AUTH]: (${path}) ->`, 'Refresh successful, committing cookies and retrying');
@@ -194,7 +140,7 @@ export class AuthService {
                 }
             } else {
                 log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized, redirecting to refresh route');
-                this.deps.redirect(`${this.config.routes.refreshAndReturn}?returnUrl=${encodeURIComponent(currentUrl)}`);
+                this.deps.redirect(this.config.routes.refreshAndReturn);
             }
         }
 
@@ -206,8 +152,7 @@ export class AuthService {
      * REANIMATOR: Handles the GET request on /api/auth/refresh-and-return.
      */
     async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse> {
-        const { searchParams } = new URL(req.url);
-        const returnUrl = searchParams.get("returnUrl") || "/";
+        const returnUrl = req.headers.get('referer') || "/";
 
         log(`[REANIMATOR-START]: (${returnUrl})`, "Re-authenticating and returning");
 
@@ -221,7 +166,7 @@ export class AuthService {
             return NextResponse.redirect(signOutUrl);
         }
 
-        const refresh = await this.refresh(returnUrl, refreshToken, req.url);
+        const refresh = await this.refresh(refreshToken, returnUrl);
 
         if (refresh.success) {
             log(`[REANIMATOR-FINISH]: (${returnUrl}) ->`, 'Success, redirecting back');
@@ -231,23 +176,17 @@ export class AuthService {
         }
 
         log(`[REANIMATOR-ERROR]: (${returnUrl}) ->`, 'Session dead');
-        return refresh.errorRedirect;
+        return NextResponse.redirect(new URL(
+            `${this.config.routes.signOut}?error=session_expired`,
+            req.url
+        ));
     }
 
     /**
      * LOW-LEVEL REFRESH: Refreshes tokens against the backend.
      */
-    async refresh(contextPath: string, refreshToken: string, reqUrl: string = this.config.baseUrl): Promise<TRefreshResponse> {
-        const safeUrl = new URL(contextPath || "", this.config.baseUrl);
-        const logPath = safeUrl.pathname;
-
+    async refresh(refreshToken: string, logPath: string = ''): Promise<RefreshResponse> {
         log(`[REFRESH-START]: (${logPath})`, 'Refreshing tokens...');
-
-        const signOutUrl = new URL(`${this.config.routes.signOut}?error=session_expired`, reqUrl);
-        const errorResponse = {
-            success: false as const,
-            errorRedirect: NextResponse.redirect(signOutUrl)
-        };
 
         try {
             const res = await fetch(`${this.config.apiUrl}/api/auth/refresh`, {
@@ -261,7 +200,7 @@ export class AuthService {
 
                 if (rawSetCookies.length === 0) {
                     log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Backend returned 200 but NO Set-Cookie headers');
-                    return errorResponse;
+                    return {success: false};
                 }
 
                 const cookieString = rawSetCookies
@@ -277,10 +216,10 @@ export class AuthService {
             }
 
             log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Backend rejected refresh', { status: res.status });
-            return errorResponse;
+            return {success: false};
         } catch (e) {
             log(`[REFRESH-ERROR]: (${logPath}) ->`, 'Critical Error', String(e));
-            return errorResponse;
+            return {success: false};
         }
     }
 
