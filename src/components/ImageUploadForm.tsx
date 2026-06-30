@@ -15,22 +15,22 @@ export default function ImageUploadForm() {
 
     return (
         <div style={{ marginTop: "20px", padding: "20px", border: "1px solid #ccc", borderRadius: "8px" }}>
-            <h3>Загрузка продукта</h3>
+            <h3>Upload Product</h3>
             <form action={action}>
                 <div style={{ marginBottom: "15px" }}>
-                    <label htmlFor="name" style={{ display: "block", marginBottom: "5px" }}>Название продукта:</label>
+                    <label htmlFor="name" style={{ display: "block", marginBottom: "5px" }}>Product name:</label>
                     <input
                         id="name"
                         name="name"
                         type="text"
-                        defaultValue="Новый товар"
+                        defaultValue="New product"
                         style={{ padding: "8px", width: "100%", borderRadius: "4px", border: "1px solid #ddd" }}
                         disabled={isPending}
                     />
                 </div>
 
                 <div style={{ marginBottom: "15px" }}>
-                    <label htmlFor="price" style={{ display: "block", marginBottom: "5px" }}>Цена:</label>
+                    <label htmlFor="price" style={{ display: "block", marginBottom: "5px" }}>Price:</label>
                     <input
                         id="price"
                         name="price"
@@ -43,7 +43,7 @@ export default function ImageUploadForm() {
 
                 <div style={{ marginBottom: "10px" }}>
                     <label htmlFor="images" style={{ display: "block", marginBottom: "5px" }}>
-                        Выберите изображения:
+                        Select images:
                     </label>
                     <input
                         id="images"
@@ -56,7 +56,7 @@ export default function ImageUploadForm() {
                     />
                 </div>
 
-                {selectedFiles > 0 && <p>Выбрано файлов: {selectedFiles}</p>}
+                {selectedFiles > 0 && <p>Files selected: {selectedFiles}</p>}
 
                 <button
                     type="submit"
@@ -70,12 +70,12 @@ export default function ImageUploadForm() {
                         cursor: isPending ? "not-allowed" : "pointer"
                     }}
                 >
-                    {isPending ? "Загрузка..." : "Отправить"}
+                    {isPending ? "Uploading..." : "Submit"}
                 </button>
             </form>
 
             {state?.error && <p style={{ color: "red", marginTop: "10px" }}>{state.error}</p>}
-            {state?.success && <p style={{ color: "green", marginTop: "10px" }}>Изображения успешно загружены!</p>}
+            {state?.success && <p style={{ color: "green", marginTop: "10px" }}>Images uploaded successfully!</p>}
         </div>
     );
 }

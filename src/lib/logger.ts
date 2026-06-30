@@ -13,7 +13,7 @@ export type LogColor = keyof typeof COLORS;
 export function createLogger(prefix: string, color: LogColor = 'reset') {
     const c = COLORS[color] || COLORS.reset;
     return (msg: string, ...args: any[]) => {
-        // Убеждаемся, что между префиксом и сообщением всегда есть пробел
+        // Ensure there is always a space between the prefix and the message
         const separator = ' ';
         console.log(`${c}${prefix}${separator}${msg}${COLORS.reset}`, ...args);
     };

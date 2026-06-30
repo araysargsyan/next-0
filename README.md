@@ -266,6 +266,20 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 
 ---
 
+## ⚙️ Environment Variables
+
+Create a `.env` file in the **project root** (it is git-ignored). The following keys are required:
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `API_URL` | Base URL of the backend API. All `protFetch` requests are prefixed with this value. | `http://localhost:4400` |
+
+```env
+API_URL=http://localhost:4400
+```
+
+---
+
 ## 🚀 Execution & Verification
 
 ### Running the Dev Server

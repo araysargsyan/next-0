@@ -22,7 +22,7 @@ export async function signInAction(_: any, formData: FormData) {
 
         if (!res.ok) {
             log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
-            return {error: "Неверный email или пароль"};
+            return {error: "Invalid email or password"};
         }
 
         const headerCookies = res.headers.getSetCookie();
@@ -37,7 +37,7 @@ export async function signInAction(_: any, formData: FormData) {
     } catch (e: any) {
         if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
         log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
-        return {error: "Внутренняя ошибка сервера"};
+        return {error: "Internal server error"};
     }
 
     redirect("/");

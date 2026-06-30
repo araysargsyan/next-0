@@ -91,7 +91,7 @@ export class AuthService {
     }
 
     /**
-     * ГЛАВНЫЙ МЕТОД: Выполняет проактивный рефреш и Double Sync.
+     * MAIN METHOD: Performs proactive token refresh and Double Sync.
      */
     async getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }> {
         const { pathname } = req.nextUrl;
@@ -136,7 +136,7 @@ export class AuthService {
     }
 
     /**
-     * ПРОДВИНУТЫЙ FETCH: Автоматически обрабатывает 401 и делает Silent Retry в экшенах.
+     * PROTECTED FETCH: Automatically handles 401 and performs Silent Retry in Server Actions.
      */
     protFetch = async <TBody = unknown>(
         path: string,
@@ -203,7 +203,7 @@ export class AuthService {
     }
 
     /**
-     * РЕАНИМАТОР: Обрабатывает GET запрос на /api/auth/refresh-and-return.
+     * REANIMATOR: Handles the GET request on /api/auth/refresh-and-return.
      */
     async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse> {
         const { searchParams } = new URL(req.url);
@@ -235,7 +235,7 @@ export class AuthService {
     }
 
     /**
-     * НИЗКОУРОВНЕВЫЙ РЕФРЕШ: Обновляет токены на бэкенде.
+     * LOW-LEVEL REFRESH: Refreshes tokens against the backend.
      */
     async refresh(contextPath: string, refreshToken: string, reqUrl: string = this.config.baseUrl): Promise<TRefreshResponse> {
         const safeUrl = new URL(contextPath || "", this.config.baseUrl);
@@ -285,7 +285,7 @@ export class AuthService {
     }
 
     /**
-     * Append raw Set-Cookie strings к response (для Middleware / Route Handlers).
+     * Appends raw Set-Cookie strings to a response (for Middleware / Route Handlers).
      */
     private applySetCookies(response: NextResponse, rawSetCookies: string[]): void {
         rawSetCookies.forEach(cookieStr => {
@@ -294,7 +294,7 @@ export class AuthService {
     }
 
     /**
-     * Коммит parsed cookies в Next.js cookie store (для Actions / Route Handlers).
+     * Commits parsed cookies into the Next.js cookie store (for Actions / Route Handlers).
      */
     async commitCookies(rawSetCookies: string[]): Promise<void> {
         const cookieStore = await this.deps.cookies();
@@ -308,7 +308,7 @@ export class AuthService {
     }
 
     /**
-     * ПАРСЕР: Реализует логику parseSetCookie из Next.js.
+     * PARSER: Implements the parseSetCookie logic from Next.js.
      */
     parseSetCookie(setCookie: string): ParsedCookie | undefined {
         if (!setCookie) return undefined;
@@ -354,7 +354,7 @@ export class AuthService {
 
         if (attrs.partitioned) cookie.partitioned = true;
 
-        // Финальная очистка: удаляем только undefined (пустые строки оставляем, чтобы куки могли стираться корректно)
+        // Final cleanup: remove only undefined values (empty strings are kept so cookies can be cleared correctly)
         return Object.fromEntries(
             Object.entries(cookie).filter(([_, v]) => v !== undefined)
         ) as ParsedCookie;

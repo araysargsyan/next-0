@@ -12,11 +12,11 @@ export async function GET(req: NextRequest) {
     
     const cookieStore = await cookies();
 
-    // 1. Очищаем сессию
+    // 1. Clear the session
     cookieStore.delete("accessToken");
     cookieStore.delete("refreshToken");
 
-    // 2. Формируем URL для входа
+    // 2. Build the sign-in redirect URL
     const signInUrl = new URL("/sign-in", req.url);
     if (error) {
         signInUrl.searchParams.set("error", error);

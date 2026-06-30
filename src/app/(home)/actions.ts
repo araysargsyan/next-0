@@ -11,23 +11,23 @@ export async function uploadImagesAction(prevState: any, formData: FormData) {
     const name = formData.get("name") as string;
     log(`[START]: (${name || 'unknown'})`, "Processing image upload...");
 
-    // Получаем все данные из формы
+    // Extract all form data
     const files = formData.getAll("images");
     const price = formData.get("price") as string;
 
     if (!files || files.length === 0) {
         log(`[ERROR]: (${name || 'unknown'}) ->`, "No files selected");
-        return { error: "Файлы не выбраны" };
+        return { error: "No files selected" };
     }
 
-    // Создаем новый объект FormData специально для отправки на бэкенд
+    // Build a new FormData object specifically for the backend upload
     const formDataToUpload = new FormData();
 
-    // Добавляем строковые поля
+    // Append string fields
     formDataToUpload.append("name", name || "Default Name");
     formDataToUpload.append("price", price || "0");
 
-    // Добавляем файлы
+    // Append files
     files.forEach((file) => {
         formDataToUpload.append("images", file);
     });
@@ -42,18 +42,18 @@ export async function uploadImagesAction(prevState: any, formData: FormData) {
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
             log(`[ERROR]: (${name || 'unknown'}) ->`, "Upload failed", { status: res.status, errorData });
-            return { error: "Ошибка при загрузке изображений на сервер" };
+            return { error: "Failed to upload images to the server" };
         }
 
         const apiResponseData = await res.json();
         log(`[FINISH]: (${name || 'unknown'}) ->`, "Upload successful", { data: apiResponseData });
 
-        revalidatePath("/"); // Обновляем страницу, чтобы увидеть результат
+        revalidatePath("/"); // Revalidate the page to reflect the new upload
         return { success: true, data: apiResponseData };
     } catch (e: any) {
         if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
 
         log(`[ERROR]: (${name || 'unknown'}) ->`, "Critical failure", String(e));
-        return { error: "Внутренняя ошибка сервера" };
+        return { error: "Internal server error" };
     }
 }

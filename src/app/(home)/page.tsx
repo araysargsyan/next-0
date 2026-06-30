@@ -11,7 +11,7 @@ export default async function Home() {
 
   if (!res.ok) {
     log("[ERROR]: Failed to load profile", { status: res.status });
-    return <div>Ошибка загрузки профиля</div>;
+    return <div>Failed to load profile</div>;
   }
 
   const user = await res.json();
@@ -19,17 +19,17 @@ export default async function Home() {
 
   return (
       <div style={{ padding: "20px" }}>
-          <h1>Главная (v1)</h1>
-          <p>Добро пожаловать, {user.name}!</p>
+          <h1>Home (v1)</h1>
+          <p>Welcome, {user.name}!</p>
 
           <ImageUploadForm />
 
           <div style={{ marginTop: "40px" }}>
-            <h3>Данные профиля:</h3>
+            <h3>Profile data:</h3>
             <pre>{JSON.stringify(user, null, 2)}</pre>
           </div>
 
-          <a href="/api/auth/sign-out">Выйти</a>
+          <a href="/api/auth/sign-out">Sign out</a>
       </div>
   );
 }

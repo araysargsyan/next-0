@@ -13,7 +13,7 @@ export default function LoginPage() {
     const getErrorMessage = (type: string | null) => {
         switch (type) {
             case "session_expired":
-                return "Ваша сессия истекла. Пожалуйста, войдите снова.";
+                return "Your session has expired. Please sign in again.";
             default:
                 return null;
         }
@@ -27,7 +27,7 @@ export default function LoginPage() {
                 action={action}
                 className="flex flex-col gap-4 w-full max-w-sm bg-white p-8 rounded-2xl shadow-lg border border-gray-100"
             >
-                <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Вход</h1>
+                <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Sign in</h1>
 
                 {infoMessage && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm text-center mb-2">
@@ -46,7 +46,7 @@ export default function LoginPage() {
                 <input
                     name="password"
                     type="password"
-                    placeholder="Пароль"
+                    placeholder="Password"
                     defaultValue="securepassword123"
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                     required
@@ -61,7 +61,7 @@ export default function LoginPage() {
                     disabled={isPending}
                     className="w-full bg-black text-white rounded-lg px-4 py-3 font-semibold hover:bg-gray-800 transition disabled:opacity-50"
                 >
-                    {isPending ? "Загрузка..." : "Войти"}
+                    {isPending ? "Loading..." : "Sign in"}
                 </button>
             </Form>
         </div>
