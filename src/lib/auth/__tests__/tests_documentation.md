@@ -6,31 +6,50 @@ This document describes the testing architecture, scenarios, and execution instr
 
 ## 🧪 What Kind of Tests Are These?
 
-These are **Unit Tests**. 
+These are **Unit Tests** running on **Jest**. 
 
 They focus on verifying the core logic, state transformations, and edge cases of the `AuthService` engine in complete isolation:
 - **No Backend Connection**: All API requests to the backend server are mocked.
-- **No Browser/Next.js Runtime Requirement**: Next.js framework APIs (`cookies()`, `headers()`, `redirect()`, `NextRequest`, `NextResponse`) are stubbed out via **Dependency Inversion**.
-- **In-Memory & Fast**: The entire 21-test suite runs in less than **60 milliseconds**.
+- **No Browser/Next.js Runtime Requirement**: Next.js framework APIs (`cookies()`, `headers()`, `redirect()`, `NextRequest`, `NextResponse`) are mocked at the module level using Jest.
+- **In-Memory & Fast**: The entire 21-test suite runs in less than **1.3 seconds** on Jest.
 
 ---
 
-## 🏗️ Mocking Strategy (Dependency Inversion in Action)
+## 🏗️ Mocking Strategy (Jest Module Mocking)
 
-Rather than mocking the `AuthService` itself (which can hide logic bugs), we test the actual class engine. We do this by passing **mock implementations** for all external boundaries during test instantiation:
+We mock all Next.js server-side modules at the module level using `jest.mock()`. This allows `AuthService` to import and use Next.js APIs directly without needing a dependency injection container in production.
 
-1. **`MockCookieStore`**: A plain JavaScript object store mimicking Next.js's read/write `cookies()` API.
-2. **`MockHeadersList`**: A simple key-value map mimicking Next.js's `headers()` API.
-3. **`MockNextRequest` & `MockNextResponse`**: Lightweight representations of Next.js Edge Runtime request and response models, bypassing heavy server setup.
-4. **Branching Fetch Spy (`mock.fn()`)**: Instead of returning hardcoded values, our fetch mock inspects the request target and resolves custom responses dynamically (e.g., returns 401 for resources but mock set-cookies for the refresh endpoint).
+1.  **`next/headers`**:
+    We mock `cookies` and `headers` to return mock stores (`mockCookies` and `mockHeaders`) that can be controlled and inspected using Jest spies (`jest.fn()`).
+2.  **`next/navigation`**:
+    We mock `redirect` to record the target URL in a `mockRedirect` spy and throw a specific `REDIRECT_THROWN` error to simulate Next.js's native redirect behavior (which throws an error to halt execution).
+3.  **`next/server`**:
+    We mock `NextRequest` and `NextResponse` inside the `jest.mock('next/server')` factory to avoid hoisting ReferenceErrors. They act as lightweight, pure-JS representations of Next.js Edge request and response objects.
+
+---
+
+## 📝 Logging Strategy (Clean Terminal Logs)
+
+To keep test output clean and easy to debug:
+- **No Stack Traces**: All `console.log` calls are intercepted via `jest.spyOn(console, 'log')` and redirected to `process.stdout.write`. This prevents Jest from appending annoying stack trace lines (e.g. `at log (src/lib/logger.ts...)`).
+- **Indentation**: Logs printed during a test's execution are automatically indented by 4 spaces.
+- **Test Boundaries**: The `beforeEach` and `afterEach` hooks extract the current test number (e.g. `5.3`) using `expect.getState().currentTestName` and print clear start/end markers:
+  ```text
+  [START] >>> 5.3
+      AuthService [REANIMATOR-START]: (/dashboard) Re-authenticating and returning
+      AuthService [REFRESH-START]: (/dashboard) Refreshing tokens...
+      AuthService [REFRESH-FINISH]: (/dashboard) -> Success {"count":2}
+      AuthService [REANIMATOR-FINISH]: (/dashboard) -> Success, redirecting back
+  [END]   <<< 5.3
+  ```
 
 ---
 
 ## 📋 Test Scenarios Breakdown
 
-The suite consists of **21 test cases** organized into **5 functional suites**:
+The suite consists of **21 test cases** organized into **5 functional sections**:
 
-### Suite 1: Cookie Parser & Commit (`parseSetCookie`, `commitCookies`)
+### 1. Cookie Parser & Commit
 Tests the parsing of backend `Set-Cookie` header strings into structured JavaScript objects.
 
 *   **1.1 Parse Standard Cookie**: Asserts that all core cookie attributes (`Domain`, `Path`, `Max-Age`, `HttpOnly`, `Secure`, `SameSite`, `Priority`, `Partitioned`) are extracted correctly.
@@ -38,16 +57,16 @@ Tests the parsing of backend `Set-Cookie` header strings into structured JavaScr
 *   **1.3 Normal Casing normalization**: Asserts that case-insensitive fields (like `SameSite=STRICT` or `Priority=MEDIUM`) are normalized to lowercase.
 *   **1.4 Multi-cookie Commit**: Asserts that `commitCookies` successfully writes multiple cookies into the Next.js `cookieStore`.
 
-### Suite 2: Low-Level Token Refresh (`refresh`)
+### 2. Low-Level Token Refresh
 Tests backend request generation and responses for token rotation.
 
 *   **2.1 Success Rotation**: Asserts that if backend returns 200 with raw `Set-Cookie` headers, they are parsed and returned as `success: true` alongside raw strings.
-*   **2.2 Empty Cookies Error**: Asserts that if backend returns 200 but has no cookie headers, it returns `success: false` and redirects to sign-out.
-*   **2.3 Rejection Error**: Asserts that if backend returns 401/500, it triggers a redirect to sign-out.
+*   **2.2 Empty Cookies Error**: Asserts that if backend returns 200 but has no cookie headers, it returns `success: false`.
+*   **2.3 Rejection Error**: Asserts that if backend returns 401/500, it returns `success: false`.
 *   **2.4 Timeout/Abort Safety**: Asserts that if the backend fetch hangs or triggers a timeout, it catches the exception and fails gracefully.
 
-### Suite 3: Middleware Gateway (`getAuthorizedResponse`)
-Tests pre-emptive session recovery inside Next.js Middleware.
+### 3. Middleware Gateway
+Tests pre-emptive session recovery inside the API Proxy / Middleware.
 
 *   **3.1 Access Token Present**: Asserts that if the access token is valid, request flows through unmodified.
 *   **3.2 No Tokens Present**: Asserts that if both tokens are missing, it flows through unmodified (allowing public route configurations to handle redirection).
@@ -59,7 +78,7 @@ Tests pre-emptive session recovery inside Next.js Middleware.
 *   **3.4 Double Sync Refresh Failure**: Asserts that if refresh fails in middleware, it redirects immediately to the sign-out route.
 *   **3.5 x-url Header Injection**: Asserts that `getAuthorizedResponse` injects the `x-url` header containing the current requested URL into the request headers.
 
-### Suite 4: Smart HTTP Client / Silent Retry (`protFetch`)
+### 4. Smart HTTP Client / Silent Retry
 Tests client calls made inside Server Actions, Route Handlers, and Server Components.
 
 *   **4.1 Normal Request**: Asserts that a standard request runs normally on 200 OK.
@@ -71,7 +90,7 @@ Tests client calls made inside Server Actions, Route Handlers, and Server Compon
 *   **4.4 Reanimator Redirect**: Asserts that if a Server Component (rendering context where writing cookies is illegal) hits a 401, it performs a stateful redirect to `/refresh-bounce?returnUrl=...`.
 *   **4.5 Instant Sign-out on Missing Refresh**: Asserts that if an Action hits 401 but has no refresh token, it skips the backend call and redirects to sign-out immediately.
 
-### Suite 5: Reanimator Handler (`handleRefreshAndReturn`)
+### 5. Reanimator Handler
 Tests the GET handler `/api/auth/refresh-and-return` bouncing users back after a background refresh.
 
 *   **5.1 Bounce Success**: Asserts that if refresh succeeds, it redirects back to the original page and appends updated `Set-Cookie` headers.
@@ -82,8 +101,6 @@ Tests the GET handler `/api/auth/refresh-and-return` bouncing users back after a
 
 ## 🚀 Execution Instructions
 
-Since the tests use Node's **native test runner** (`node:test`) and **type-stripping engine**, execution is completely package-free.
-
 Run tests using the project's configured npm script:
 ```bash
 npm run test
@@ -91,6 +108,6 @@ npm run test
 
 *Under the hood, this executes:*
 ```bash
-npx tsx --test src/lib/auth/__tests__/AuthService.test.ts
+jest
 ```
-*(Uses lightweight TS execution to strip typings and pass them straight to Node's built-in testing library).*
+*(Uses Jest to execute all `.test.ts` files in the project).*

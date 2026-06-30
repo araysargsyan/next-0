@@ -43,5 +43,5 @@ next-env.d.ts
 # project specific
 /for-ai/
 /.idea/
-/collaboration-rules.md
+/.swc
 
