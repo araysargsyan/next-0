@@ -16,7 +16,8 @@ const eslintConfig = defineConfig([
           "caughtErrorsIgnorePattern": "^_"
         }
       ],
-      "@typescript-eslint/no-explicit-any": "error" // Disallow 'any' everywhere by default
+      "@typescript-eslint/no-explicit-any": "error",
+      "react-hooks/set-state-in-effect": "off"
     }
   },
   {

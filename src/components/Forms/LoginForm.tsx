@@ -4,12 +4,13 @@ import {useActionState, Suspense, useEffect, useState} from "react";
 import {signInAction} from "@/app/sign-in/actions";
 import Formy from "./index";
 import {useSearchParams} from "next/navigation";
+import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 
 function InfoMessage() {
     const searchParams = useSearchParams();
     const [message, setMessage] = useState<string | null>(null);
 
-    useEffect(() => {
+    useIsomorphicLayoutEffect(() => {
         const errorType = searchParams.get("error");
         const wasLoggedIn = localStorage.getItem("was_logged_in");
 
@@ -32,6 +33,9 @@ function InfoMessage() {
 export default function LoginForm() {
     const [state, action, isPending] = useActionState(signInAction, {error: ""});
 
+    useIsomorphicLayoutEffect(() => {
+        console.log("Hello from LoginForm");
+    }, []);
     const handleSubmit = () => {
         localStorage.setItem("was_logged_in", "true");
     };
