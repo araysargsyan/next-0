@@ -33,9 +33,6 @@ function InfoMessage() {
 export default function LoginForm() {
     const [state, action, isPending] = useActionState(signInAction, {error: ""});
 
-    useIsomorphicLayoutEffect(() => {
-        console.log("Hello from LoginForm");
-    }, []);
     const handleSubmit = () => {
         localStorage.setItem("was_logged_in", "true");
     };
