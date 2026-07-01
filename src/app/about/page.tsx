@@ -1,11 +1,15 @@
 import {protFetch} from "@/lib/auth";
-import ImageUploadForm from "@/components/ImageUploadForm";
+import ImageUploadForm from "@/components/Forms/ImageUploadForm";
 import { createLogger } from "@/lib/logger";
+import SignOutLink from "@/components/SignOutLink";
 
 const log = createLogger('HomePage', 'green');
 
-export default async function Home() {
+export default async function About() {
   log("[START]: Rendering home page");
+
+  // Artificial delay to test loading state
+  // await new Promise(resolve => setTimeout(resolve, 2000));
 
   const res = await protFetch("/api/auth/me");
 
@@ -32,7 +36,7 @@ export default async function Home() {
             <pre>{JSON.stringify(user, null, 2)}</pre>
           </div>
 
-          <a href="/api/auth/sign-out">Sign out</a>
+          <SignOutLink style={{ color: "red" }}>Sign out</SignOutLink>
       </div>
   );
 }

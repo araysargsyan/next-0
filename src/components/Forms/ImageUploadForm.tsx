@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { uploadImagesAction } from "../app/(home)/actions";
+import { uploadImagesAction } from "@/app/(home)/actions";
+import Formy from "./index";
 
 export default function ImageUploadForm() {
     const [state, action, isPending] = useActionState(uploadImagesAction, null);
@@ -16,7 +17,7 @@ export default function ImageUploadForm() {
     return (
         <div style={{ marginTop: "20px", padding: "20px", border: "1px solid #ccc", borderRadius: "8px" }}>
             <h3>Upload Product</h3>
-            <form action={action}>
+            <Formy action={action} className="">
                 <div style={{ marginBottom: "15px" }}>
                     <label htmlFor="name" style={{ display: "block", marginBottom: "5px" }}>Product name:</label>
                     <input
@@ -72,7 +73,7 @@ export default function ImageUploadForm() {
                 >
                     {isPending ? "Uploading..." : "Submit"}
                 </button>
-            </form>
+            </Formy>
 
             {state?.error && <p style={{ color: "red", marginTop: "10px" }}>{state.error}</p>}
             {state?.success && <p style={{ color: "green", marginTop: "10px" }}>Images uploaded successfully!</p>}
