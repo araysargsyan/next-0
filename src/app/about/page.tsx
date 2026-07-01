@@ -8,9 +8,6 @@ const log = createLogger('HomePage', 'green');
 export default async function About() {
   log("[START]: Rendering home page");
 
-  // Artificial delay to test loading state
-  // await new Promise(resolve => setTimeout(resolve, 2000));
-
   const res = await protFetch("/api/auth/me");
 
   if (!res.ok) {
