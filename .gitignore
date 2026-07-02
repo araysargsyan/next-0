@@ -41,7 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # project specific
-/for-ai/
+/.agents/
 /.idea/
 /.swc
 
