@@ -22,7 +22,7 @@ export async function signInAction(_: unknown, formData: FormData) {
 
         if (!res.ok) {
             log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
-            return {error: "Invalid email or password"};
+            redirect("/sign-in?error=invalid_credentials");
         }
 
         const headerCookies = res.headers.getSetCookie();
@@ -32,8 +32,6 @@ export async function signInAction(_: unknown, formData: FormData) {
         }
 
         log(`[FINISH]: (${email}) ->`, "Success, redirecting to home");
-        // redirect('/') must be outside try/catch or handled carefully, 
-        // but Next.js 15+ handles it in Server Actions.
     } catch (e) {
         if (e && typeof e === 'object' && 'digest' in e && typeof (e as { digest: string }).digest === 'string') {
             if ((e as { digest: string }).digest.startsWith('NEXT_REDIRECT')) throw e;

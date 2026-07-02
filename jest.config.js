@@ -7,13 +7,26 @@ const createJestConfig = nextJest({
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
-  testEnvironment: 'node',
-  moduleNameMapper: {
-    // Handle module aliases (this will be automatically configured if you have paths in tsconfig.json)
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
-  // Automatically clear mock calls and instances between every test
-  clearMocks: true,
+  projects: [
+    {
+      displayName: 'unit',
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts', '<rootDir>/src/**/*.spec.ts'],
+      moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/src/$1',
+      },
+      clearMocks: true,
+    },
+    {
+      displayName: 'e2e',
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/tests/**/*.e2e-spec.ts'],
+      moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/src/$1',
+      },
+      clearMocks: true,
+    }
+  ]
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
