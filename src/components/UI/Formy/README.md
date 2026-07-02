@@ -16,13 +16,12 @@
 ## Folder Structure
 
 ```
-src/components/Forms/
-├── index.tsx          # Generic <Formy /> component and wrapper hook
-├── README.md          # Component documentation
-└── LoginForm/         # Encapsulated feature-scoped login form
-    ├── index.tsx      # Server Component: LoginForm layout & fields
-    ├── handlers.tsx   # Client Component: submitHandler callback
-    └── InfoMessage.tsx # Client Component: search-param Toast alerts
+src/components/UI/Formy/
+├── index.tsx          # Core component and hook entry, exports types/context
+├── FormyContext.ts    # Shared Formy context
+├── FormyError.tsx     # Custom error display component
+├── types.ts           # Type definitions
+└── README.md          # This documentation
 ```
 
 ---
@@ -32,7 +31,7 @@ src/components/Forms/
 ### Pattern A: Static Server Form with Client Handlers (Recommended)
 Use this pattern to keep 100% of your input fields and layout static (non-hydrated). Client-side events (like writing to `localStorage` on submit) are kept in a separate Client Reference file.
 
-#### 1. Define Client Event Handlers (`handlers.tsx`)
+#### 1. Define Client Event Handlers (e.g. `handlers.tsx`)
 ```tsx
 'use client'
 
@@ -41,9 +40,9 @@ export const submitHandler = () => {
 };
 ```
 
-#### 2. Compose the Form in a Server Component (`index.tsx`)
+#### 2. Compose the Form in a Server Component (e.g. `index.tsx`)
 ```tsx
-import Formy from "../index";
+import Formy from "@/components/UI/Formy";
 import { signInAction } from "@/app/sign-in/actions";
 import { submitHandler } from "./handlers"; // Imported as a serializable Client Reference!
 
@@ -70,7 +69,7 @@ Use this pattern if the layout of your inputs needs to change dynamically in the
 ```tsx
 'use client'
 
-import Formy from "./index";
+import Formy from "@/components/UI/Formy";
 import { uploadImagesAction } from "@/app/(home)/actions";
 
 export default function ImageUploadForm() {
@@ -104,12 +103,3 @@ export default function ImageUploadForm() {
 | `onStateChange` | `(state: Awaited<State> \| undefined) => void` | No | Client-side callback triggered whenever the state returned from the Server Action updates. |
 | `submitLabel` | `string` | No | Text to display on the default submit button. If omitted, no default button is rendered. |
 | `loadingLabel` | `string` | No | Text to display on the submit button while `isPending` is true. Defaults to `"Loading..."`. |
-
----
-
-## Technical Details
-
-### Why Client References are Serializable:
-In React Server Components, importing a function from a `'use client'` file (like `submitHandler` from `handlers.tsx`) compiles into a serializable proxy reference object rather than raw JavaScript closure code. 
-
-Because it is a serialized object, it can be safely passed down as a prop (`onSubmit`) across the server-to-client boundary. Once inside the client browser, React automatically resolves this reference back to the actual client-side function and binds it as the form event listener, keeping the server-rendered fields lightweight and static.

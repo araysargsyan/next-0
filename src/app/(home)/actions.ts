@@ -17,7 +17,7 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
 
     if (!files || files.length === 0) {
         log(`[ERROR]: (${name || 'unknown'}) ->`, "No files selected");
-        return { error: "No files selected" };
+        return { success: false, error: "No files selected" };
     }
 
     // Build a new FormData object specifically for the backend upload
@@ -42,7 +42,7 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
             log(`[ERROR]: (${name || 'unknown'}) ->`, "Upload failed", { status: res.status, errorData });
-            return { error: "Failed to upload images to the server" };
+            return { success: false, error: "Failed to upload images to the server" };
         }
 
         const apiResponseData = await res.json();
@@ -51,11 +51,7 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
         revalidatePath("/"); // Revalidate the page to reflect the new upload
         return { success: true, data: apiResponseData };
     } catch (e) {
-        if (e && typeof e === 'object' && 'digest' in e && typeof (e as { digest: string }).digest === 'string') {
-            if ((e as { digest: string }).digest.startsWith('NEXT_REDIRECT')) throw e;
-        }
-
         log(`[ERROR]: (${name || 'unknown'}) ->`, "Critical failure", String(e));
-        return { error: "Internal server error" };
+        return { success: false, error: "Internal server error" };
     }
 }

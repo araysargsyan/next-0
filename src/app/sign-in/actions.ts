@@ -1,6 +1,5 @@
 "use server";
 
-import {redirect} from "next/navigation";
 import {API_URL} from "@/config";
 import {AuthService} from "@/lib/auth";
 import {createLogger} from "@/lib/logger";
@@ -10,7 +9,6 @@ const log = createLogger('SignInAction', 'magenta');
 export async function signInAction(_: unknown, formData: FormData) {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-
     log(`[START]: (${email})`, { email });
 
     try {
@@ -22,7 +20,7 @@ export async function signInAction(_: unknown, formData: FormData) {
 
         if (!res.ok) {
             log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
-            redirect("/sign-in?error=invalid_credentials");
+            return { success: false, error: "Invalid email or password" };
         }
 
         const headerCookies = res.headers.getSetCookie();
@@ -31,14 +29,10 @@ export async function signInAction(_: unknown, formData: FormData) {
             await AuthService.commitCookies(headerCookies);
         }
 
-        log(`[FINISH]: (${email}) ->`, "Success, redirecting to home");
+        log(`[FINISH]: (${email}) ->`, "Success");
+        return { success: true };
     } catch (e) {
-        if (e && typeof e === 'object' && 'digest' in e && typeof (e as { digest: string }).digest === 'string') {
-            if ((e as { digest: string }).digest.startsWith('NEXT_REDIRECT')) throw e;
-        }
         log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
-        return {error: "Internal server error"};
+        return { success: false, error: "Internal server error" };
     }
-
-    redirect("/");
 }

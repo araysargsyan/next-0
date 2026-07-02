@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import {ChangeEvent, useState} from "react";
 import { uploadImagesAction } from "@/app/(home)/actions";
-import Formy from "./index";
+import Formy from "@/components/UI/Formy";
 
 export default function ImageUploadForm() {
     const [selectedFiles, setSelectedFiles] = useState<number>(0);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setSelectedFiles(e.target.files.length);
         }
@@ -78,7 +78,7 @@ export default function ImageUploadForm() {
                             {isPending ? "Uploading..." : "Submit"}
                         </button>
 
-                        {state?.error && <p style={{ color: "red", marginTop: "10px" }}>{state.error}</p>}
+                        {"error" in (state ?? {}) && <p style={{ color: "red", marginTop: "10px" }}>{(state as { error: string }).error}</p>}
                         {state?.success && <p style={{ color: "green", marginTop: "10px" }}>Images uploaded successfully!</p>}
                     </>
                 )}
