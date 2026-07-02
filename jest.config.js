@@ -5,29 +5,31 @@ const createJestConfig = nextJest({
   dir: './',
 });
 
-// Add any custom config to be passed to Jest
-const customJestConfig = {
-  projects: [
-    {
-      displayName: 'unit',
-      testEnvironment: 'node',
-      testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts', '<rootDir>/src/**/*.spec.ts'],
-      moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1',
-      },
-      clearMocks: true,
+module.exports = async () => {
+  // Resolve individual project configs with SWC compilation enabled
+  const unitConfig = await createJestConfig({
+    testEnvironment: 'node',
+    testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts', '<rootDir>/src/**/*.spec.ts'],
+    moduleNameMapper: {
+      '^@/(.*)$': '<rootDir>/src/$1',
     },
-    {
-      displayName: 'e2e',
-      testEnvironment: 'node',
-      testMatch: ['<rootDir>/tests/**/*.e2e-spec.ts'],
-      moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1',
-      },
-      clearMocks: true,
-    }
-  ]
-};
+    clearMocks: true,
+  })();
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-module.exports = createJestConfig(customJestConfig);
+  const e2eConfig = await createJestConfig({
+    testEnvironment: 'node',
+    testMatch: ['<rootDir>/tests/**/*.e2e-spec.ts'],
+    moduleNameMapper: {
+      '^@/(.*)$': '<rootDir>/src/$1',
+    },
+    clearMocks: true,
+  })();
+
+  // Set the display names
+  unitConfig.displayName = 'unit';
+  e2eConfig.displayName = 'e2e';
+
+  return {
+    projects: [unitConfig, e2eConfig],
+  };
+};
