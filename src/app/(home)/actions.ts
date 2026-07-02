@@ -2,8 +2,8 @@
 
 import { protFetch } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-
 import { createLogger } from "@/lib/logger";
+import { parseApiError } from "@/lib/utils/error";
 
 const log = createLogger('UploadAction', 'magenta');
 
@@ -24,9 +24,9 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
     const formDataToUpload = new FormData();
 
     // Append string fields
-    formDataToUpload.append("name", name || "Default Name");
-    formDataToUpload.append("price", price || "0");
-
+    formDataToUpload.append("name", name);
+    formDataToUpload.append("price", price);
+    console.log(666, price)
     // Append files
     files.forEach((file) => {
         formDataToUpload.append("images", file);
@@ -42,7 +42,9 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
             log(`[ERROR]: (${name || 'unknown'}) ->`, "Upload failed", { status: res.status, errorData });
-            return { success: false, error: "Failed to upload images to the server" };
+
+            const errorMessage = parseApiError(errorData);
+            return { success: false, error: errorMessage };
         }
 
         const apiResponseData = await res.json();
@@ -52,6 +54,6 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
         return { success: true, data: apiResponseData };
     } catch (e) {
         log(`[ERROR]: (${name || 'unknown'}) ->`, "Critical failure", String(e));
-        return { success: false, error: "Internal server error" };
+        return { success: false, error: "Something went wrong. Please try again later." };
     }
 }

@@ -28,7 +28,6 @@ export default function ImageUploadForm() {
                                 id="name"
                                 name="name"
                                 type="text"
-                                defaultValue="New product"
                                 style={{ padding: "8px", width: "100%", borderRadius: "4px", border: "1px solid #ddd" }}
                                 disabled={isPending}
                             />
@@ -40,7 +39,6 @@ export default function ImageUploadForm() {
                                 id="price"
                                 name="price"
                                 type="number"
-                                defaultValue="1000"
                                 style={{ padding: "8px", width: "100%", borderRadius: "4px", border: "1px solid #ddd" }}
                                 disabled={isPending}
                             />

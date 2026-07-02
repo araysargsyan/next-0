@@ -1,8 +1,9 @@
 "use server";
 
-import {API_URL} from "@/config";
-import {AuthService} from "@/lib/auth";
-import {createLogger} from "@/lib/logger";
+import { API_URL } from "@/config";
+import { AuthService } from "@/lib/auth";
+import { createLogger } from "@/lib/logger";
+import { parseApiError } from "@/lib/utils/error";
 
 const log = createLogger('SignInAction', 'magenta');
 
@@ -14,13 +15,22 @@ export async function signInAction(_: unknown, formData: FormData) {
     try {
         const res = await fetch(`${API_URL}/api/auth/sign-in`, {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({email, password}),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
         });
 
         if (!res.ok) {
             log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
-            return { success: false, error: "Invalid email or password" };
+            
+            let errorMessage = "Something went wrong. Please try again later.";
+            try {
+                const errBody = await res.json();
+                errorMessage = parseApiError(errBody);
+            } catch {
+                // Ignore JSON parsing errors
+            }
+
+            return { success: false, error: errorMessage };
         }
 
         const headerCookies = res.headers.getSetCookie();
@@ -33,6 +43,6 @@ export async function signInAction(_: unknown, formData: FormData) {
         return { success: true };
     } catch (e) {
         log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
-        return { success: false, error: "Internal server error" };
+        return { success: false, error: "Something went wrong. Please try again later." };
     }
 }

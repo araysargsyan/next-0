@@ -24,7 +24,7 @@ export default function LoginForm() {
 
             <input
                 name="email"
-                type="email"
+                // type="email"
                 placeholder="Email"
                 defaultValue="john.doe@example.com"
                 className="w-full border border-gray-300 rounded-lg mb-4 px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"

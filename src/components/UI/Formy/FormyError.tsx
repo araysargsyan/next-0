@@ -7,7 +7,7 @@ export default function FormyError() {
     const { state } = useContext(FormyContext);
     const anchorRef = useRef<HTMLDivElement>(null);
     const [anchorTop, setAnchorTop] = useState(0);
-    const error = state && "error" in state ? state.error : null;
+    const error = (state && "error" in state ? state.error : null) ?? null;
 
     useIsomorphicLayoutEffect(() => {
         if (anchorRef.current && error) {
@@ -28,6 +28,8 @@ export default function FormyError() {
                     left: 0,
                     right: 0,
                     transform: error ? `translateY(-100%)` : `translateY(calc(-100% - ${anchorTop+1}px))`,
+                    opacity: error ? 1 : 0,
+                    transition: "opacity 0.2s ease-in-out, transform 0.2s ease-in-out",
                     pointerEvents: error ? "auto" : "none",
                 }}
                 className="text-rose-800 text-sm flex items-center gap-2"
