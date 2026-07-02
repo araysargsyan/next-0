@@ -328,8 +328,8 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Signature**:
   ```typescript
   interface AuthService {
-    getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }>;
-}
+      getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }>;
+  }
   ```
 - **Returns**: A promise resolving to the next `NextResponse` (containing request modifications) and an `isRefreshed` boolean indicator.
 
@@ -343,11 +343,11 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Signature**:
   ```typescript
   interface AuthService {
-    protFetch<TBody = unknown>(
-        path: string,
-        options?: Omit<RequestInit, "body"> & { body?: TBody, isAction?: boolean }
-    ): Promise<Response>;
-}
+      protFetch<TBody = unknown>(
+          path: string,
+          options?: Omit<RequestInit, "body"> & { body?: TBody, isAction?: boolean }
+      ): Promise<Response>;
+  }
   ```
 - **Exceptions**: Can throw a Next.js redirect error (which must be allowed to propagate up to the Next.js router engine).
 
@@ -359,8 +359,8 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Signature**:
   ```typescript
   interface AuthService {
-    handleRefreshAndReturn(req: NextRequest): Promise<NextResponse>;
-}
+      handleRefreshAndReturn(req: NextRequest): Promise<NextResponse>;
+  }
   ```
 
 ---
@@ -371,8 +371,8 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Signature**:
   ```typescript
   interface AuthService {
-    commitCookies(rawSetCookies: string[]): Promise<void>;
-}
+      commitCookies(rawSetCookies: string[]): Promise<void>;
+  }
   ```
 
 ---
@@ -385,8 +385,8 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Signature**:
   ```typescript
   interface AuthService {
-    parseSetCookie(setCookie: string): ParsedCookie | undefined;
-}
+      parseSetCookie(setCookie: string): ParsedCookie | undefined;
+  }
   ```
 
 ---

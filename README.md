@@ -22,7 +22,7 @@ At the center of this project is the **`AuthService` SDK**, a custom-built, depe
 All logic relating to authentication, proactive token rotation, double cookie synchronization (proxy and browser), and silent retries is encapsulated within the custom `AuthService` SDK.
 
 For details on the architecture (the 3-layer protection model), diagrams, pitfalls solved, Client Component integration via Server Actions, and logging prefixes, please refer to the dedicated SDK documentation:
-👉 **[AuthService SDK Documentation (src/lib/auth/README.md)](file:///C:/Users/arays/Documents/Projects/next-0/src/lib/auth/README.md)**
+👉 **[AuthService SDK Documentation (src/lib/auth/README.md)](./src/lib/auth/README.md)**
 
 ---
 
