@@ -327,9 +327,9 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Purpose**: Checks the incoming request's tokens. If the access token is missing or expired, but the refresh token is present, it calls the backend refresh endpoint, updates request headers (Double Sync), and appends `Set-Cookie` headers to the response. It also injects the `x-url` header containing the requested URL to facilitate page restoration.
 - **Signature**:
   ```typescript
-  class AuthService {
-      async getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }>;
-  }
+  interface AuthService {
+    getAuthorizedResponse(req: NextRequest): Promise<{ response: NextResponse, isRefreshed: boolean }>;
+}
   ```
 - **Returns**: A promise resolving to the next `NextResponse` (containing request modifications) and an `isRefreshed` boolean indicator.
 
@@ -342,12 +342,12 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
   - If `isAction` is `false` (Server Component): Throws a Next.js `redirect()` exception pointing to the Reanimator route.
 - **Signature**:
   ```typescript
-  class AuthService {
-      async protFetch<TBody = unknown>(
-          path: string,
-          options?: Omit<RequestInit, "body"> & { body?: TBody, isAction?: boolean }
-      ): Promise<Response>;
-  }
+  interface AuthService {
+    protFetch<TBody = unknown>(
+        path: string,
+        options?: Omit<RequestInit, "body"> & { body?: TBody, isAction?: boolean }
+    ): Promise<Response>;
+}
   ```
 - **Exceptions**: Can throw a Next.js redirect error (which must be allowed to propagate up to the Next.js router engine).
 
@@ -358,9 +358,9 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Purpose**: Acts as the Reanimator landing page. It reads the return URL from search parameters, initiates low-level token rotation, appends the fresh `Set-Cookie` tokens to the redirection, and redirects back to the original page.
 - **Signature**:
   ```typescript
-  class AuthService {
-      async handleRefreshAndReturn(req: NextRequest): Promise<NextResponse>;
-  }
+  interface AuthService {
+    handleRefreshAndReturn(req: NextRequest): Promise<NextResponse>;
+}
   ```
 
 ---
@@ -370,9 +370,9 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Purpose**: Takes a list of raw `Set-Cookie` strings returned by the backend auth API, parses them individually, and writes them into the Next.js cookie store using the `cookies().set()` API.
 - **Signature**:
   ```typescript
-  class AuthService {
-      async commitCookies(rawSetCookies: string[]): Promise<void>;
-  }
+  interface AuthService {
+    commitCookies(rawSetCookies: string[]): Promise<void>;
+}
   ```
 
 ---
@@ -384,9 +384,9 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 - **Edge Case (Max-Age=0)**: Explicitly parses empty values (e.g. `accessToken=; Max-Age=0`) to preserve empty strings `""` instead of omitting them, ensuring session deletions are committed properly.
 - **Signature**:
   ```typescript
-  class AuthService {
-      parseSetCookie(setCookie: string): ParsedCookie | undefined;
-  }
+  interface AuthService {
+    parseSetCookie(setCookie: string): ParsedCookie | undefined;
+}
   ```
 
 ---
@@ -396,8 +396,8 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 The low-level refresh handler calls the backend authentication endpoint (`/api/auth/refresh`) using the HTTP `Cookie` header. It wraps the execution with an `AbortSignal.timeout` to prevent connection hangs.
 
 ```typescript
-class AuthService {
-    async refresh(refreshToken: string, logPath?: string): Promise<RefreshResponse>;
+interface AuthService {
+    refresh(refreshToken: string, logPath?: string): Promise<RefreshResponse>;
 }
 ```
 
