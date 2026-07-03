@@ -3,7 +3,7 @@
 import { API_URL } from "@/config";
 import { AuthService } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
-import { parseApiError } from "@/lib/utils/error";
+import { parseApiError, ParsedApiError } from "@/lib/utils/error";
 
 const log = createLogger('SignInAction', 'magenta');
 
@@ -22,7 +22,7 @@ export async function signInAction(_: unknown, formData: FormData) {
         if (!res.ok) {
             log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
             
-            let errorMessage = "Something went wrong. Please try again later.";
+            let errorMessage: ParsedApiError = "Something went wrong. Please try again later.";
             try {
                 const errBody = await res.json();
                 errorMessage = parseApiError(errBody);

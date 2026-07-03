@@ -31,7 +31,7 @@ For details on the architecture (the 3-layer protection model), diagrams, pitfal
 The project includes `Formy`, a generic, type-safe wrapper around React 19's `useActionState` and HTML `<form>`. It simplifies form status tracking (loading states, pending status) and enables zero-hydration static forms composition (RSC composition) by leveraging Next.js Client References for browser-side handlers.
 
 For details on configuration, patterns (static vs. dynamic), and APIs, please refer to the dedicated Formy documentation:
-👉 **[Formy Component Documentation (src/components/Forms/README.md)](./src/components/Forms/README.md)**
+👉 **[Formy Component Documentation (src/components/UI/Formy/README.md)](./src/components/UI/Formy/README.md)**
 
 ---
 

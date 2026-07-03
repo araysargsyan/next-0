@@ -3,7 +3,7 @@ import { signInAction } from "@/app/sign-in/actions";
 import Formy from "@/components/UI/Formy";
 import InfoMessage from "./InfoMessage";
 import FormyError from "@/components/UI/Formy/FormyError";
-import { handleStateChange } from "./handlers";
+import { handleStateChange, parsePasswordMessage } from "./handlers";
 
 export const dynamic = "force-static";
 
@@ -11,7 +11,7 @@ export default function LoginForm() {
     return (
         <Formy
             action={signInAction}
-            className="relative overflow-hidden flex flex-col"
+            className="relative flex flex-col"
             submitLabel="Sign in"
             loadingLabel="Signing in..."
             onStateChange={handleStateChange}
@@ -22,24 +22,38 @@ export default function LoginForm() {
                 <InfoMessage />
             </Suspense>
 
-            <input
-                name="email"
-                // type="email"
-                placeholder="Email"
-                defaultValue="john.doe@example.com"
-                className="w-full border border-gray-300 rounded-lg mb-4 px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                required
-            />
+            {/* Email Field Wrapper */}
+            <div className="relative mb-6">
+                <input
+                    name="email"
+                    type="email"
+                    placeholder="Email"
+                    defaultValue="bb@aa.aa"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                    required
+                />
+                <FormyError field="email" below />
+            </div>
 
-            <input
-                name="password"
-                type="password"
-                placeholder="Password"
-                defaultValue="securepassword123"
-                className="w-full border border-gray-300 rounded-lg mb-8 px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                required
-            />
+            {/* Password Field Wrapper */}
+            <div className="relative mb-8">
+                <input
+                    name="password"
+                    type="password"
+                    placeholder="Password"
+                    defaultValue="AAaa12$$"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                    required
+                />
+                <FormyError
+                    field="password"
+                    below
+                    hasHelp
+                    parseMessage={parsePasswordMessage}
+                />
+            </div>
 
+            {/* Global Error Above Submit Button */}
             <FormyError />
         </Formy>
     );

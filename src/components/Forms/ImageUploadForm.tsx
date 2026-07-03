@@ -76,7 +76,13 @@ export default function ImageUploadForm() {
                             {isPending ? "Uploading..." : "Submit"}
                         </button>
 
-                        {"error" in (state ?? {}) && <p style={{ color: "red", marginTop: "10px" }}>{(state as { error: string }).error}</p>}
+                        {state && "error" in state && state.error && (
+                            <p style={{ color: "red", marginTop: "10px" }}>
+                                {typeof state.error === "string"
+                                    ? state.error
+                                    : Object.values(state.error).join(", ")}
+                            </p>
+                        )}
                         {state?.success && <p style={{ color: "green", marginTop: "10px" }}>Images uploaded successfully!</p>}
                     </>
                 )}

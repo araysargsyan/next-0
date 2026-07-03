@@ -2,7 +2,7 @@ import { ReactNode, ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 
 export type FormyActionState =
-    | { success: boolean; error?: string }
+    | { success: boolean; error?: string | Record<string, string> | null }
     | { success: boolean; data?: unknown };
 
 export type StrictFormyState<T> = {

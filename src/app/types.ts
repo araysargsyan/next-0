@@ -6,6 +6,7 @@ export interface ApiErrorResponse {
 }
 
 export interface ApiErrorPayload {
+    message?: string;
     exception?: {
         response?: ApiErrorResponse | string;
         status?: number;
