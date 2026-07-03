@@ -1,5 +1,5 @@
 'use client'
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useContext } from "react";
 import { useRouter } from "next/navigation";
 import { FormyActionState, StrictFormyState, FormyProps } from "./types";
 import { FormyContext } from "./FormyContext";
@@ -80,4 +80,37 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             </form>
         </FormyContext.Provider>
     );
+}
+
+interface FormySubmitProps extends React.ComponentProps<"button"> {
+    loadingLabel?: string;
+}
+
+export function FormySubmit({ loadingLabel, children, className, style, ...props }: FormySubmitProps) {
+    const { isPending } = useContext(FormyContext);
+
+    const resolvedStyle = {
+        ...style,
+        backgroundColor: isPending ? "#ccc" : style?.backgroundColor
+    };
+
+    return (
+        <button
+            type="submit"
+            disabled={isPending || props.disabled}
+            style={resolvedStyle}
+            className={className}
+            {...props}
+        >
+            {isPending && loadingLabel ? loadingLabel : children}
+        </button>
+    );
+}
+
+export function FormySuccess({ children }: { children: React.ReactNode }) {
+    const { state } = useContext(FormyContext);
+    if (state && "success" in state && state.success) {
+        return <>{children}</>;
+    }
+    return null;
 }

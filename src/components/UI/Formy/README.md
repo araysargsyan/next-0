@@ -18,7 +18,7 @@
 
 ```
 src/components/UI/Formy/
-├── index.tsx          # Core component and hook entry, exports types/context
+├── index.tsx          # Core component, exports hooks/helper components (FormySubmit, FormySuccess)
 ├── FormyContext.ts    # Shared Formy context
 ├── FormyError.tsx     # Custom error display component with animations & tooltips
 ├── types.ts           # Type definitions
@@ -65,6 +65,7 @@ export const parsePasswordMessage = (msg: string) => {
 ```tsx
 import Formy from "@/components/UI/Formy";
 import FormyError from "@/components/UI/Formy/FormyError";
+import { FormySubmit } from "@/components/UI/Formy";
 import { signInAction } from "@/app/sign-in/actions";
 import { handleStateChange, parsePasswordMessage } from "./handlers"; // Client Reference!
 
@@ -72,8 +73,7 @@ export default function LoginForm() {
     return (
         <Formy
             action={signInAction}
-            className="relative flex flex-col"
-            submitLabel="Sign in"
+            className="flex flex-col"
             onStateChange={handleStateChange}
         >
             <div className="relative mb-6">
@@ -91,8 +91,16 @@ export default function LoginForm() {
                 />
             </div>
 
-            {/* Global form error */}
-            <FormyError />
+            {/* Relative Wrapper for Global Error and Submit Button */}
+            <div className="relative">
+                <FormyError />
+                <FormySubmit
+                    loadingLabel="Signing in..."
+                    className="w-full bg-black text-white rounded-lg px-4 py-2"
+                >
+                    Sign in
+                </FormySubmit>
+            </div>
         </Formy>
     );
 }
@@ -105,7 +113,7 @@ export default function LoginForm() {
 `FormyError` handles error rendering dynamically, and is **100% CSS-driven** (no `useLayoutEffect`, `useRef`, or `useState` measurements are used, ensuring zero layout shifts and maximum performance):
 
 * **Field-level Errors**: Adding the `field` prop filters the form state to only display error arrays associated with that specific input name. Setting the `below` prop positions the error absolutely under the relative input container via CSS `translateY(4px)` relative to the container's `top: 100%` bottom edge.
-* **Global Errors**: Omitting the `field` prop catches root-level exception messages (e.g., "Invalid email or password"). It renders above the input wrapper at `top: 0` with `translateY(calc(-100% - 4px))`.
+* **Global Errors**: Omitting the `field` prop catches root-level exception messages (e.g., "Invalid email or password"). It renders absolutely at `top: 0` and is shifted up by its height via `translateY(calc(-100% - 4px))` relative to its nearest `relative` wrapper (like the wrapper for the submit button). This prevents any layout shifts and page header collisions.
 * **Help Tooltips**: Setting `hasHelp` displays an info icon next to the error text. Hovering over it fades and scales in a glassmorphism styled popup containing detailed requirements (e.g. password criteria parsed using `parseMessage`).
 
 ---
@@ -138,3 +146,24 @@ export default function LoginForm() {
 | `hasHelp` | `boolean` | No | `false` | Displays an interactive info icon next to the error text. |
 | `helpText` | `string` | No | `""` | Content to display inside the hoverable glassmorphism tooltip popup. |
 | `parseMessage` | `(message: string) => { title: string; info: string }` | No | `undefined` | A callback to split a single error string into a short title and a detailed tooltip description. |
+| `absolute` | `boolean` | No | `true` | If true, uses absolute positioning to prevent layout shifts. If false, renders as a standard block element in-flow. |
+
+---
+
+### `FormySubmitProps`
+
+`FormySubmit` is a custom Client button wrapper that inherits all standard HTML button attributes and automatically handles loading state changes.
+
+| Prop | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `loadingLabel` | `string` | No | `undefined` | Text to display on the button when the form is submitting (`isPending` is true). |
+
+---
+
+### `FormySuccess`
+
+`FormySuccess` is a wrapper component that renders its children only when the form action completes successfully.
+
+| Prop | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `children` | `ReactNode` | Yes | `undefined` | Elements to display when `state.success` is true. |

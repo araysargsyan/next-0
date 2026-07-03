@@ -107,44 +107,55 @@ export class AuthService {
             cache: "no-store",
         });
 
-        let res = await doFetch();
+        try {
+            let res = await doFetch();
 
-        if (res.status === 401) {
-            if (isAction) {
-                log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized in Action, attempting silent refresh and retry');
+            if (res.status === 401) {
+                if (isAction) {
+                    log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized in Action, attempting silent refresh and retry');
 
-                const refreshToken = cookieStore.get(refreshTokenName)?.value;
-                if (!refreshToken) {
-                    log(`[FETCH-ERROR]: (${path}) ->`, 'No refresh token available, redirecting to sign-out');
-                    return redirect(`${this.config.routes.signOut}?error=session_expired`);
-                }
+                    const refreshToken = cookieStore.get(refreshTokenName)?.value;
+                    if (!refreshToken) {
+                        log(`[FETCH-ERROR]: (${path}) ->`, 'No refresh token available, redirecting to sign-out');
+                        return redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    }
 
-                const refresh = await this.refresh(refreshToken, path);
+                    const refresh = await this.refresh(refreshToken, path);
 
-                if (refresh.success) {
-                    log(`[FETCH-AUTH]: (${path}) ->`, 'Refresh successful, committing cookies and retrying');
-                    await this.commitCookies(refresh.rawSetCookies);
+                    if (refresh.success) {
+                        log(`[FETCH-AUTH]: (${path}) ->`, 'Refresh successful, committing cookies and retrying');
+                        await this.commitCookies(refresh.rawSetCookies);
 
-                    res = await doFetch();
-                    log(`[FETCH-FINISH]: (${path}) ->`, 'Retry successful', { status: res.status });
-                    return res;
+                        res = await doFetch();
+                        log(`[FETCH-FINISH]: (${path}) ->`, 'Retry successful', { status: res.status });
+                        return res;
+                    } else {
+                        log(`[FETCH-ERROR]: (${path}) ->`, 'Refresh failed in Action, redirecting to sign-out');
+                        return redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    }
                 } else {
-                    log(`[FETCH-ERROR]: (${path}) ->`, 'Refresh failed in Action, redirecting to sign-out');
-                    return redirect(`${this.config.routes.signOut}?error=session_expired`);
+                    log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized, redirecting to refresh route');
+                    const headersStore = await headers();
+                    const currentUrl = headersStore.get('x-url') || '';
+                    const returnUrl = currentUrl
+                        ? `${this.config.routes.refreshAndReturn}?returnUrl=${encodeURIComponent(currentUrl)}`
+                        : this.config.routes.refreshAndReturn;
+                    return redirect(returnUrl);
                 }
-            } else {
-                log(`[FETCH-ERROR]: (${path}) ->`, '401 Unauthorized, redirecting to refresh route');
-                const headersStore = await headers();
-                const currentUrl = headersStore.get('x-url') || '';
-                const returnUrl = currentUrl
-                    ? `${this.config.routes.refreshAndReturn}?returnUrl=${encodeURIComponent(currentUrl)}`
-                    : this.config.routes.refreshAndReturn;
-                return redirect(returnUrl);
             }
-        }
 
-        log(`[FETCH-FINISH]: (${path}) ->`, { status: res.status });
-        return res;
+            log(`[FETCH-FINISH]: (${path}) ->`, { status: res.status });
+            return res;
+        } catch (e) {
+            log(`[FETCH-ERROR]: (${path}) -> Connection failed`, String(e));
+            return new Response(JSON.stringify({
+                message: "Backend server is offline or unreachable."
+            }), {
+                status: 503,
+                statusText: "Service Unavailable",
+                headers: { "Content-Type": "application/json" }
+            });
+        }
     }
 
     /**
