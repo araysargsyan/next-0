@@ -1,5 +1,6 @@
 import { ReactNode, ComponentProps } from "react";
 import { useRouter } from "next/navigation";
+import Form from "next/form";
 
 export type FormyActionState =
     | { success: boolean; error?: string | Record<string, string> | null }
@@ -10,7 +11,7 @@ export type StrictFormyState<T> = {
 };
 
 export interface FormyProps<State extends FormyActionState & StrictFormyState<State> = FormyActionState> 
-    extends Omit<ComponentProps<"form">, "children" | "action"> {
+    extends Omit<ComponentProps<typeof Form>, "children" | "action"> {
     action?: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>);
     initialState?: Awaited<State> | null;
     children?: ReactNode | ((state: Awaited<State> | null, isPending: boolean) => ReactNode);

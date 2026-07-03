@@ -1,38 +1,16 @@
 'use client'
-import { useActionState, useEffect, useState, useContext } from "react";
+import { useEffect, useRef, SubmitEvent } from "react";
 import { useRouter } from "next/navigation";
+import Form from "next/form";
 import { FormyActionState, StrictFormyState, FormyProps } from "./types";
 import { FormyContext } from "./FormyContext";
+import { useFormyActionState } from "./useFormyActionState";
 
 export * from "./types";
 export * from "./FormyContext";
-
-export function useFormyActionState<State extends FormyActionState>(
-    action: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>) | undefined,
-    initialState: Awaited<State> | null
-): [
-    state: Awaited<State> | null,
-    dispatch: string | undefined | ((payload: FormData) => void),
-    isPending: boolean | null
-] {
-    const isFunction = typeof action === "function";
-    const [initialIsFunction] = useState(isFunction);
-
-    if (initialIsFunction !== isFunction) {
-        throw new Error(
-            `Formy: The action prop type cannot be changed dynamically from ${
-                initialIsFunction ? "a function" : "a string/undefined"
-            } to ${isFunction ? "a function" : "a string/undefined"} during the lifecycle of the component.`
-        );
-    }
-
-    if (typeof action === "function") {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        return useActionState(action, initialState);
-    } else {
-        return [null, action, null]
-    }
-}
+export * from "./useFormyActionState";
+export * from "./FormySubmit";
+export * from "./FormySuccess";
 
 export default function Formy<State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
     action,
@@ -54,18 +32,58 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     const resolvedFormAction = formAction || "";
     const resolvedIsPending = !!isPending;
 
+    const formRef = useRef<HTMLFormElement>(null);
+    const savedValues = useRef<Record<string, string>>({});
+
     useEffect(() => {
         if (onStateChange && state !== null) {
             onStateChange(state, router);
         }
     }, [state, onStateChange, router]);
 
+    // Restore form values after Action/RSC Refresh resets them on error
+    useEffect(() => {
+        if (resolvedState && "success" in resolvedState && resolvedState.success) {
+            savedValues.current = {};
+            return;
+        }
+
+        if (!resolvedIsPending && formRef.current && Object.keys(savedValues.current).length > 0) {
+            const inputs = formRef.current.querySelectorAll("input, textarea, select");
+            inputs.forEach((input) => {
+                const htmlInput = input as HTMLInputElement;
+                const name = htmlInput.name;
+                if (name && savedValues.current[name] !== undefined) {
+                    htmlInput.value = savedValues.current[name];
+                }
+            });
+        }
+    }, [resolvedState, resolvedIsPending]);
+
+    const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
+        if (formRef.current) {
+            const formData = new FormData(formRef.current);
+            const values: Record<string, string> = {};
+            formData.forEach((val, key) => {
+                if (typeof val === "string") {
+                    values[key] = val;
+                }
+            });
+            savedValues.current = values;
+        }
+        if (props.onSubmit) {
+            props.onSubmit(e);
+        }
+    };
+
     return (
         <FormyContext.Provider value={{ state: resolvedState, isPending: resolvedIsPending }}>
-            <form
+            <Form
+                ref={formRef}
                 action={resolvedFormAction}
                 className={className}
                 {...props}
+                onSubmit={handleSubmit}
             >
                 {typeof children === "function" ? children(resolvedState, resolvedIsPending) : children}
                 {submitLabel && (
@@ -77,40 +95,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                         {resolvedIsPending ? loadingLabel : submitLabel}
                     </button>
                 )}
-            </form>
+            </Form>
         </FormyContext.Provider>
     );
-}
-
-interface FormySubmitProps extends React.ComponentProps<"button"> {
-    loadingLabel?: string;
-}
-
-export function FormySubmit({ loadingLabel, children, className, style, ...props }: FormySubmitProps) {
-    const { isPending } = useContext(FormyContext);
-
-    const resolvedStyle = {
-        ...style,
-        backgroundColor: isPending ? "#ccc" : style?.backgroundColor
-    };
-
-    return (
-        <button
-            type="submit"
-            disabled={isPending || props.disabled}
-            style={resolvedStyle}
-            className={className}
-            {...props}
-        >
-            {isPending && loadingLabel ? loadingLabel : children}
-        </button>
-    );
-}
-
-export function FormySuccess({ children }: { children: React.ReactNode }) {
-    const { state } = useContext(FormyContext);
-    if (state && "success" in state && state.success) {
-        return <>{children}</>;
-    }
-    return null;
 }

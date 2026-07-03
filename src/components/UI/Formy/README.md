@@ -11,6 +11,7 @@
 3. **Type Assertion Free**: Fully integrates with React 19's promise unwrapping (`Awaited<State>`) without using any `as` type assertions or runtime bypasses.
 4. **Action Type Safeguards**: Detects and throws clean developer errors if a form's action is dynamically switched from a function to a string (or vice-versa) during the component's lifecycle, preventing React hook-ordering crashes.
 5. **Robust Error Subsystem**: Encapsulates field-specific and global error banners via `FormyError` supporting animations, custom text formatting, and interactive help tooltips.
+6. **DOM-level Restoration for Uncontrolled Inputs**: React 19's `form.reset()` and Next.js post-action RSC refresh can reset uncontrolled inputs (`defaultValue`) on validation error. `Formy` automatically buffers and restores these input values directly in the DOM on failure, keeping inputs static/uncontrolled while preserving user state.
 
 ---
 
@@ -18,11 +19,14 @@
 
 ```
 src/components/UI/Formy/
-├── index.tsx          # Core component, exports hooks/helper components (FormySubmit, FormySuccess)
-├── FormyContext.ts    # Shared Formy context
-├── FormyError.tsx     # Custom error display component with animations & tooltips
-├── types.ts           # Type definitions
-└── README.md          # This documentation
+├── index.tsx                # Core component
+├── FormyContext.ts          # Shared Formy context
+├── FormyError.tsx           # Custom error display component
+├── FormySubmit.tsx          # Client-side submit button
+├── FormySuccess.tsx         # Success state wrapper
+├── useFormyActionState.ts   # React 19 useActionState logic wrapper
+├── types.ts                 # Type definitions
+└── README.md                # This documentation
 ```
 
 ---
