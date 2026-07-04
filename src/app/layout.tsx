@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ReactNode } from "react";
+import FormStoreProvider from "@/components/Providers/FormStoreProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,11 +22,15 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <FormStoreProvider>
+          {children}
+        </FormStoreProvider>
+      </body>
     </html>
   );
 }

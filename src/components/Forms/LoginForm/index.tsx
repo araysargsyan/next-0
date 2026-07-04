@@ -11,6 +11,7 @@ export const dynamic = "force-static";
 export default function LoginForm() {
     return (
         <Formy
+            id="login-form"
             action={signInAction}
             className="flex flex-col"
             onStateChange={handleStateChange}

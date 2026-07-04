@@ -8,6 +8,7 @@ export default function ImageUploadForm() {
         <div style={{ marginTop: "20px", padding: "20px", border: "1px solid #ccc", borderRadius: "8px" }}>
             <h3>Upload Product</h3>
             <Formy
+                id="image-upload-form"
                 action={uploadImagesAction}
                 className="relative flex flex-col"
             >
