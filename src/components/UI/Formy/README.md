@@ -1,173 +1,348 @@
-# Formy Component System
+﻿# Formy
 
-`Formy` is a generic, type-safe Next.js wrapper around React 19's `useActionState` and standard HTML `<form>` elements. It is designed to bridge the boundary between **React Server Components (RSC)** and **Client Components**, enabling high-performance, non-hydrated forms with custom browser event logic.
+> **Zero-hydration Server Action forms for Next.js 15+ and React 19.**
+> Keep your inputs on the server. Keep your data on error.
 
----
-
-## Key Features
-
-1. **RSC Composition Pattern**: Allows child input fields to remain 100% static HTML (rendering on the server, zero client hydration weight) while wrapping them in client-side submit/state behaviors.
-2. **Strict Null State**: Enforces `null` instead of `undefined` as the explicit initial/default value for props, states, and contexts to guarantee clean Type narrowing.
-3. **Type Assertion Free**: Fully integrates with React 19's promise unwrapping (`Awaited<State>`) without using any `as` type assertions or runtime bypasses.
-4. **Action Type Safeguards**: Detects and throws clean developer errors if a form's action is dynamically switched from a function to a string (or vice-versa) during the component's lifecycle, preventing React hook-ordering crashes.
-5. **Robust Error Subsystem**: Encapsulates field-specific and global error banners via `FormyError` supporting animations, custom text formatting, and interactive help tooltips.
-6. **DOM-level Restoration for Uncontrolled Inputs**: React 19's `form.reset()` and Next.js post-action RSC refresh can reset uncontrolled inputs (`defaultValue`) on validation error. `Formy` automatically buffers and restores these input values directly in the DOM on failure, keeping inputs static/uncontrolled while preserving user state.
+[![npm version](https://img.shields.io/npm/v/formy)](https://www.npmjs.com/package/formy)
+[![license](https://img.shields.io/npm/l/formy)](./LICENSE)
+[![react](https://img.shields.io/badge/react-19%2B-blue)](https://react.dev)
+[![next](https://img.shields.io/badge/next.js-15%2B-black)](https://nextjs.org)
 
 ---
 
-## Folder Structure
+## The Problem
 
+React 19 introduced a painful behavior for Server Action forms: **`form.reset()` is called automatically after every action completes** — including on validation errors.
+
+This means if a user submits a login form and the server returns `{ success: false, error: "Wrong password" }`, React 19 treats the action as *successfully completed* and **wipes all input values**. The user loses their typed email and has to start over.
+
+The community workarounds are unsatisfying:
+
+| Approach | Downside |
+| :--- | :--- |
+| Make the whole form `'use client'` with `useState` | Entire form markup moves to the JS bundle. RSC advantages lost. |
+| Use `react-hook-form` | Requires full client hydration of all fields. Heavy bundle cost. |
+| Persist values in URL query params | Pollutes browser history. Insecure for auth forms. |
+| Use `defaultValue` + `key` reset trick | Causes full form re-mount and visual flicker. |
+
+**Formy solves this elegantly** — without any of these tradeoffs.
+
+---
+
+## How It Works
+
+Formy intercepts the form's `onSubmit` event to **snapshot all input values into a `useRef` cache** before the Server Action fires. After the action completes on error, it **imperatively restores those values directly in the DOM** — completely bypassing React 19's automatic `form.reset()`.
+
+This means:
+- Your `<input>` fields can stay in a **Server Component** (pure static HTML, zero JS hydration weight).
+- On error, the user's typed values are preserved automatically.
+- On success, the cache is cleared and the form resets cleanly.
+
+---
+
+## Installation
+
+```bash
+npm install formy
 ```
-src/components/UI/Formy/
-├── index.tsx                # Core component
-├── FormyContext.ts          # Shared Formy context
-├── FormyError.tsx           # Custom error display component
-├── FormySubmit.tsx          # Client-side submit button
-├── FormySuccess.tsx         # Success state wrapper
-├── useFormyActionState.ts   # React 19 useActionState logic wrapper
-├── types.ts                 # Type definitions
-└── README.md                # This documentation
+
+**Peer dependencies:**
+
+```bash
+npm install next@^15 react@^19 react-dom@^19
 ```
+
+---
+
+## Quick Start
+
+### 1. Define a Server Action
+
+```tsx
+// app/sign-in/actions.ts
+'use server'
+
+export async function signInAction(
+    _state: { success: boolean; error?: string | Record<string, string> } | null,
+    formData: FormData
+) {
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    const user = await db.user.findByEmail(email);
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+        return { success: false, error: 'Invalid email or password.' };
+    }
+
+    return { success: true };
+}
+```
+
+### 2. Build the Form (Server Component)
+
+```tsx
+// components/LoginForm.tsx
+import Formy from 'formy';
+import { FormyError, FormySubmit } from 'formy';
+import { signInAction } from '@/app/sign-in/actions';
+
+// All <input> fields are pure Server Component HTML — zero JS bundle cost.
+export default function LoginForm() {
+    return (
+        <Formy action={signInAction} className="flex flex-col gap-4 w-full max-w-sm">
+
+            <div className="relative">
+                <input name="email" type="email" placeholder="Email" required />
+                <FormyError field="email" below />
+            </div>
+
+            <div className="relative">
+                <input name="password" type="password" placeholder="Password" required />
+                <FormyError field="password" below />
+            </div>
+
+            <div className="relative">
+                <FormyError />
+                <FormySubmit loadingLabel="Signing in...">Sign in</FormySubmit>
+            </div>
+
+        </Formy>
+    );
+}
+```
+
+That's it. On a validation error, the user's email and password are preserved. On success, the form resets cleanly.
 
 ---
 
 ## Usage Patterns
 
-### Pattern A: Static Server Form with Client Handlers (Recommended)
-Use this pattern to keep 100% of your input fields and layout static (non-hydrated). Client-side events (like writing to `localStorage` on submit) are kept in a separate Client Reference file.
+### Pattern A: Client Callback on Success (Recommended for Auth)
 
-#### 1. Define Client Event Handlers (e.g. `handlers.tsx`)
+Use `onStateChange` to run client-side logic (like redirecting or writing to `localStorage`) when the Server Action state changes.
+
+**`handlers.tsx`** — a separate Client Reference file:
+
 ```tsx
 'use client'
 
-import { useRouter } from "next/navigation";
-import { FormyActionState } from "@/components/UI/Formy";
+import { useRouter } from 'next/navigation';
+import type { FormyActionState } from 'formy';
 
 export const handleStateChange = (
     state: FormyActionState | null,
     router: ReturnType<typeof useRouter>
 ) => {
     if (state?.success) {
-        localStorage.setItem("was_logged_in", "true");
-        router.push("/");
+        localStorage.setItem('was_logged_in', 'true');
+        router.push('/dashboard');
     }
-};
-
-export const parsePasswordMessage = (msg: string) => {
-    const dotIndex = msg.indexOf(". ");
-    if (dotIndex !== -1) {
-        return {
-            title: msg.slice(0, dotIndex + 1), // "Password is too weak."
-            info: msg.slice(dotIndex + 2) // "It must be at least 8 characters..."
-        };
-    }
-    return { title: msg, info: "" };
 };
 ```
 
-#### 2. Compose the Form in a Server Component (e.g. `index.tsx`)
+**`LoginForm.tsx`** — still a Server Component:
+
 ```tsx
-import Formy from "@/components/UI/Formy";
-import FormyError from "@/components/UI/Formy/FormyError";
-import { FormySubmit } from "@/components/UI/Formy";
-import { signInAction } from "@/app/sign-in/actions";
-import { handleStateChange, parsePasswordMessage } from "./handlers"; // Client Reference!
+import Formy from 'formy';
+import { FormySubmit, FormyError } from 'formy';
+import { signInAction } from '@/app/sign-in/actions';
+import { handleStateChange } from './handlers'; // Client Reference
 
 export default function LoginForm() {
     return (
-        <Formy
-            action={signInAction}
-            className="flex flex-col"
-            onStateChange={handleStateChange}
-        >
-            <div className="relative mb-6">
-                <input name="email" type="email" required className="w-full border px-4 py-2" />
-                <FormyError field="email" below />
-            </div>
+        <Formy action={signInAction} onStateChange={handleStateChange}>
+            <input name="email" type="email" required />
+            <FormyError field="email" below />
 
-            <div className="relative mb-8">
-                <input name="password" type="password" required className="w-full border px-4 py-2" />
-                <FormyError 
-                    field="password" 
-                    below 
-                    hasHelp
-                    parseMessage={parsePasswordMessage}
-                />
-            </div>
+            <input name="password" type="password" required />
+            <FormyError field="password" below hasHelp helpText="Min 8 chars, one uppercase, one number." />
 
-            {/* Relative Wrapper for Global Error and Submit Button */}
-            <div className="relative">
-                <FormyError />
-                <FormySubmit
-                    loadingLabel="Signing in..."
-                    className="w-full bg-black text-white rounded-lg px-4 py-2"
-                >
-                    Sign in
-                </FormySubmit>
-            </div>
+            <FormyError />
+            <FormySubmit loadingLabel="Signing in...">Sign in</FormySubmit>
         </Formy>
     );
 }
 ```
 
----
+### Pattern B: Render-prop Children (Dynamic State Access)
 
-## Error Handling (`FormyError`)
+Pass a function as `children` to access the current action state and pending status directly in your JSX.
 
-`FormyError` handles error rendering dynamically, and is **100% CSS-driven** (no `useLayoutEffect`, `useRef`, or `useState` measurements are used, ensuring zero layout shifts and maximum performance):
+```tsx
+<Formy action={submitAction}>
+    {(state, isPending) => (
+        <>
+            <input name="username" type="text" required />
+            {isPending && <p>Submitting...</p>}
+            {state?.success && <p>Done!</p>}
+            <FormySubmit>Submit</FormySubmit>
+        </>
+    )}
+</Formy>
+```
 
-* **Field-level Errors**: Adding the `field` prop filters the form state to only display error arrays associated with that specific input name. Setting the `below` prop positions the error absolutely under the relative input container via CSS `translateY(4px)` relative to the container's `top: 100%` bottom edge.
-* **Global Errors**: Omitting the `field` prop catches root-level exception messages (e.g., "Invalid email or password"). It renders absolutely at `top: 0` and is shifted up by its height via `translateY(calc(-100% - 4px))` relative to its nearest `relative` wrapper (like the wrapper for the submit button). This prevents any layout shifts and page header collisions.
-* **Help Tooltips**: Setting `hasHelp` displays an info icon next to the error text. Hovering over it fades and scales in a glassmorphism styled popup containing detailed requirements (e.g. password criteria parsed using `parseMessage`).
+### Pattern C: Field-specific vs. Global Errors
+
+Your Server Action can return either a single string error or a field-keyed object:
+
+```tsx
+// Global error — displayed by <FormyError /> (no `field` prop)
+return { success: false, error: 'Something went wrong.' };
+
+// Field-specific errors — each displayed by matching <FormyError field="..." />
+return {
+    success: false,
+    error: {
+        email: 'This email is not registered.',
+        password: 'Password must be at least 8 characters.',
+    }
+};
+```
+
+### Pattern D: Success-only Children with `FormySuccess`
+
+Wrap content in `<FormySuccess>` to render it only when `state.success === true`:
+
+```tsx
+<Formy action={subscribeAction}>
+    <input name="email" type="email" required />
+    <FormySuccess>
+        <p>You are subscribed!</p>
+    </FormySuccess>
+    <FormySubmit>Subscribe</FormySubmit>
+</Formy>
+```
+
+### Pattern E: Custom Type-safe State
+
+Extend `FormyActionState` for strongly-typed custom fields on the returned state:
+
+```tsx
+import type { FormyActionState, StrictFormyState } from 'formy';
+
+type MyState = FormyActionState & {
+    data?: { userId: string };
+};
+
+async function myAction(
+    _state: MyState | null,
+    formData: FormData
+): Promise<MyState> {
+    // ...
+    return { success: true, data: { userId: '123' } };
+}
+
+// In your component:
+<Formy<MyState> action={myAction}>
+    {(state) => (
+        <>
+            <input name="username" />
+            {state?.data?.userId && <p>Welcome, user {state.data.userId}!</p>}
+            <FormySubmit>Submit</FormySubmit>
+        </>
+    )}
+</Formy>
+```
 
 ---
 
 ## API Reference
 
-### `FormyProps<State>`
+### `<Formy>` Props
 
-`Formy` extends the standard HTML `<form>` attributes, omitting only `children` and `action`.
+Extends all standard `next/form` (`<Form>`) props, omitting `children` and `action`.
 
-| Prop | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `action` | `string \| ((state: Awaited<State> \| null, payload: FormData) => State \| Promise<State>)` | No | `undefined` | A Server Action (function) or standard endpoint (string url) for form submissions. |
-| `initialState` | `Awaited<State> \| null` | No | `null` | The initial state passed to `useActionState` before submission. |
-| `children` | `ReactNode \| ((state: Awaited<State> \| null, isPending: boolean) => ReactNode)` | Yes | `undefined` | Form fields. Can be standard JSX elements, or a render function receiving the runtime state. |
-| `onStateChange` | `(state: Awaited<State> \| null, router: ReturnType<typeof useRouter>) => void` | No | `undefined` | Client-side callback triggered whenever the state returned from the Server Action updates. |
-| `submitLabel` | `string` | No | `undefined` | Text to display on the default submit button. If omitted, no default button is rendered. |
-| `loadingLabel` | `string` | No | `"Loading..."` | Text to display on the submit button while `isPending` is true. |
-
----
-
-### `FormyErrorProps`
-
-`FormyError` is used to display either field-specific validation errors or global form exceptions.
-
-| Prop | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `field` | `string` | No | `undefined` | The name of the input field to capture validation errors for. If omitted, handles global exceptions. |
-| `below` | `boolean` | No | `false` | If true, positions the error below the input container (`top: 100%`). If false, positions it above (`top: 0`). |
-| `hasHelp` | `boolean` | No | `false` | Displays an interactive info icon next to the error text. |
-| `helpText` | `string` | No | `""` | Content to display inside the hoverable glassmorphism tooltip popup. |
-| `parseMessage` | `(message: string) => { title: string; info: string }` | No | `undefined` | A callback to split a single error string into a short title and a detailed tooltip description. |
-| `absolute` | `boolean` | No | `true` | If true, uses absolute positioning to prevent layout shifts. If false, renders as a standard block element in-flow. |
+| Prop | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `action` | `string \| ServerAction` | `undefined` | A Server Action function or a standard URL string for native form submission. |
+| `initialState` | `State \| null` | `null` | Initial state passed to `useActionState` before the first submission. |
+| `children` | `ReactNode \| ((state, isPending) => ReactNode)` | — | Form content. Accepts JSX or a render-prop function for dynamic state access. |
+| `onStateChange` | `(state, router) => void` | `undefined` | Client callback fired whenever the Server Action returns a new state. Receives the Next.js `router` for programmatic navigation. |
+| `submitLabel` | `string` | `undefined` | Enables a built-in default submit button with this label text. |
+| `loadingLabel` | `string` | `"Loading..."` | Text for the built-in submit button while submitting. |
+| `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
 
 ---
 
-### `FormySubmitProps`
+### `<FormyError>` Props
 
-`FormySubmit` is a custom Client button wrapper that inherits all standard HTML button attributes and automatically handles loading state changes.
+Renders field-specific or global error messages from the action state. Zero layout shift by default via absolute positioning.
 
-| Prop | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `loadingLabel` | `string` | No | `undefined` | Text to display on the button when the form is submitting (`isPending` is true). |
+| Prop | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `field` | `string` | `undefined` | Target input name. If omitted, captures the global (string) error. |
+| `below` | `boolean` | `false` | Positions the error below the input (`top: 100%`). Default is above. |
+| `absolute` | `boolean` | `true` | Absolute positioning to prevent layout shifts. Set `false` for in-flow rendering. |
+| `hasHelp` | `boolean` | `false` | Shows an interactive info icon next to the error. |
+| `helpText` | `string` | `""` | Static text inside the glassmorphism help tooltip. |
+| `parseMessage` | `(msg: string) => { title: string; info: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. |
 
 ---
 
-### `FormySuccess`
+### `<FormySubmit>` Props
 
-`FormySuccess` is a wrapper component that renders its children only when the form action completes successfully.
+Extends all standard `<button>` props. Automatically disables and shows loading text while the action is pending.
 
-| Prop | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `children` | `ReactNode` | Yes | `undefined` | Elements to display when `state.success` is true. |
+| Prop | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `loadingLabel` | `string` | `undefined` | Button label while `isPending` is true. |
+
+---
+
+### `<FormySuccess>` Props
+
+Renders children only when `state.success === true`.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `children` | `ReactNode` | Content to show on success. |
+
+---
+
+### `useFormyActionState<State>(action, initialState)`
+
+A hook that wraps React 19's `useActionState`. Safely handles both Server Action functions and plain URL strings. Throws a developer-friendly error if the action type changes dynamically (which would violate React's rules of hooks).
+
+**Returns:** `[state, dispatch, isPending]`
+
+---
+
+### `FormyActionState` Type
+
+The base constraint for all Formy action return types. Your Server Action must return a shape that satisfies this type.
+
+```tsx
+type FormyActionState =
+    | { success: boolean; error?: string | Record<string, string> | null }
+    | { success: boolean; data?: unknown };
+```
+
+---
+
+## Why Not `react-hook-form` or `next-safe-action`?
+
+| | `react-hook-form` | `next-safe-action` | **Formy** |
+| :--- | :---: | :---: | :---: |
+| Works with Server Actions | ✅ | ✅ | ✅ |
+| Inputs stay in Server Components (RSC) | ❌ | ✅ | ✅ |
+| Preserves input values on validation error | ✅ | ❌ | ✅ |
+| Zero extra JS bundle for input markup | ❌ | ✅ | ✅ |
+| Built-in error display components | ✅ | ❌ | ✅ |
+| No external dependencies | ❌ | ❌ | ✅ |
+| TypeScript-first | ✅ | ✅ | ✅ |
+
+Formy is the only solution that **keeps input fields on the server** while **preserving user-typed values on error** — with no extra dependencies.
+
+---
+
+## Requirements
+
+- **Next.js** `^15.0.0`
+- **React** `^19.0.0`
+- **react-dom** `^19.0.0`
+
+---
+
+## License
+
+MIT

@@ -10,9 +10,12 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:unit": "jest --selectProjects unit",
-    "test:e2e": "jest --selectProjects e2e"
+    "test:e2e": "jest --selectProjects e2e",
+    "analyze": "next experimental-analyze",
+    "analyze:webpack": "node -e \"process.env.ANALYZE='true'; require('child_process').execSync('next build --webpack', {stdio: 'inherit'})\""
   },
   "dependencies": {
+    "@next/bundle-analyzer": "^16.2.10",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
