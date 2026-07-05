@@ -9,6 +9,10 @@ import { FormyContext } from "./contexts/FormyContext";
 import { FormyPersistContext } from "./contexts/FormyPersistContext";
 import { useFormyActionState } from "./hooks/useFormyActionState";
 import { setNativeValue, setNativeChecked } from "./utils/domHelpers";
+import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("Formy", "cyan");
 
 export default function Formy<State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
     action,
@@ -23,7 +27,6 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
 }: FormyProps<State>) {
     const router = useRouter();
     const [state, formAction, isPending] = useFormyActionState<State>(action, initialState);
-
     const resolvedFormAction = formAction || "";
     const resolvedIsPending = !!isPending;
 
@@ -60,26 +63,27 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         }
     }
 
-    // Reset editedFields when a new submission starts (resolvedIsPending transitions false -> true)
+    // Reset editedFields when a submission finishes (resolvedIsPending transitions true -> false)
     const [prevIsPendingState, setPrevIsPendingState] = useState(false);
     if (resolvedIsPending !== prevIsPendingState) {
         setPrevIsPendingState(resolvedIsPending);
-        if (resolvedIsPending) {
+        if (!resolvedIsPending && prevIsPendingState) {
             setEditedFields({});
         }
     }
 
-    console.log(
-        `%c[Formy: ${props.id ?? "anonymous"}] 🔄 render`,
-        "color: #00bfff; font-weight: bold;",
-        { state, resolvedIsPending, clientErrors, editedFields }
-    );
+    useIsomorphicLayoutEffect(()=>{
+        log(`[${props.id ?? "anonymous"}] 🔄 render`, { state, resolvedIsPending, clientErrors, editedFields });
+    })
 
     const registerValidator = useCallback((name: string, validateFn: (value: string) => string | null) => {
         validators.current[name] = validateFn;
         return () => {
             delete validators.current[name];
             setClientErrors((prev) => {
+                if (validators.current[name]) {
+                    return prev;
+                }
                 const next = { ...prev };
                 delete next[name];
                 return next;
@@ -127,11 +131,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         const validateFn = validators.current[name];
         if (validateFn) {
             const error = validateFn(value);
-            console.log(
-                `%c[Formy: ${props.id ?? "anonymous"}] validate [${name}]:`,
-                "color: #da70d6; font-weight: bold;",
-                error ? `FAILED (${error})` : "PASSED"
-            );
+            log(`[${props.id ?? "anonymous"}] validate [${name}]:`, error ? `FAILED (${error})` : "PASSED");
             setClientErrors((prev) => {
                 const next = { ...prev };
                 if (error) {
@@ -146,11 +146,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
 
     const restoreFromValues = useCallback((formEl: HTMLFormElement, values: Record<string, string>) => {
         if (Object.keys(values).length === 0) return;
-        console.log(
-            `%c[Formy: ${props.id ?? "anonymous"}] restoring DOM values`,
-            "color: #20b2aa; font-weight: bold;",
-            values
-        );
+        log(`[${props.id ?? "anonymous"}] restoring DOM values`, values);
         formEl.querySelectorAll("input, textarea, select").forEach((el) => {
             const input = el as HTMLInputElement;
             if (!input.name || values[input.name] === undefined) return;
@@ -198,11 +194,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
 
         const values = persist.values;
         if (values && formRef.current && Object.keys(values).length > 0) {
-            console.log(
-                `%c[Formy: ${props.id ?? "anonymous"}] mount hydration: restoring from store`,
-                "color: #32cd32; font-weight: bold;",
-                values
-            );
+            log(`[${props.id ?? "anonymous"}] mount hydration: restoring from store`, values);
             isRestoring.current = true;
             restoreFromValues(formRef.current, values);
             isRestoring.current = false;
@@ -214,18 +206,12 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     useEffect(() => {
         if (resolvedState && "success" in resolvedState && resolvedState.success) {
             if (clearOnSuccess) {
-                console.log(
-                    `%c[Formy: ${props.id ?? "anonymous"}] action succeeded, clearing state`,
-                    "color: #32cd32; font-weight: bold;"
-                );
+                log(`[${props.id ?? "anonymous"}] action succeeded, clearing state`);
                 persistRef.current.clear();
                 savedValues.current = {};
                 savedFiles.current = {};
             } else if (formRef.current) {
-                console.log(
-                    `%c[Formy: ${props.id ?? "anonymous"}] action succeeded, restoring final values`,
-                    "color: #32cd32; font-weight: bold;"
-                );
+                log(`[${props.id ?? "anonymous"}] action succeeded, restoring final values`);
                 isRestoring.current = true;
                 restoreFromValues(formRef.current, persistRef.current.values ?? savedValues.current);
                 isRestoring.current = false;
@@ -238,9 +224,8 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         prevIsPending.current = resolvedIsPending;
 
         if (didTransitionEnd && formRef.current) {
-            console.log(
-                `%c[Formy: ${props.id ?? "anonymous"}] transition ended, restoring values`,
-                "color: #ffa500; font-weight: bold;",
+            log(
+                `[${props.id ?? "anonymous"}] transition ended, restoring values`,
                 persistRef.current.values ?? savedValues.current
             );
             isRestoring.current = true;
@@ -269,11 +254,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             });
             savedValues.current = values;
 
-            console.log(
-                `%c[Formy: ${props.id ?? "anonymous"}] submitting form`,
-                "color: #ff1493; font-weight: bold;",
-                values
-            );
+            log(`[${props.id ?? "anonymous"}] submitting form`, values);
 
             // Run client-side validation on submission
             const errors: Record<string, string> = {};
@@ -285,11 +266,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             });
 
             if (Object.keys(errors).length > 0) {
-                console.log(
-                    `%c[Formy: ${props.id ?? "anonymous"}] client validation failed`,
-                    "color: #d8000c; font-weight: bold;",
-                    errors
-                );
+                log(`[${props.id ?? "anonymous"}] client validation failed`, errors);
                 e.preventDefault();
                 setClientErrors(errors);
                 return;
@@ -309,11 +286,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             if (target.name) {
                 markFieldAsEdited(target.name);
                 if (target.type !== "file" && target.type !== "checkbox" && target.type !== "radio") {
-                    console.log(
-                        `%c[Formy: ${props.id ?? "anonymous"}] input [${target.name}]:`,
-                        "color: #ff8c00; font-weight: bold;",
-                        target.value
-                    );
+                    log(`[${props.id ?? "anonymous"}] input [${target.name}]:`, target.value);
                     persist.setValue(target.name, target.value);
                     runFieldValidation(target.name, target.value);
                 }
@@ -333,40 +306,23 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             if (target.name) {
                 markFieldAsEdited(target.name);
                 if (target instanceof HTMLInputElement && target.type === "checkbox") {
-                    console.log(
-                        `%c[Formy: ${props.id ?? "anonymous"}] checkbox changed [${target.name}]:`,
-                        "color: #ff8c00; font-weight: bold;",
-                        target.checked
-                    );
+                    log(`[${props.id ?? "anonymous"}] checkbox changed [${target.name}]:`, target.checked);
                     persist.setValue(target.name, target.checked ? "true" : "false");
                     runFieldValidation(target.name, target.checked ? "true" : "false");
                 } else if (target instanceof HTMLInputElement && target.type === "radio") {
                     if (target.checked) {
-                        console.log(
-                            `%c[Formy: ${props.id ?? "anonymous"}] radio changed [${target.name}]:`,
-                            "color: #ff8c00; font-weight: bold;",
-                            target.value
-                        );
+                        log(`[${props.id ?? "anonymous"}] radio changed [${target.name}]:`, target.value);
                         persist.setValue(target.name, target.value);
                         runFieldValidation(target.name, target.value);
                     }
                 } else if (target instanceof HTMLSelectElement) {
-                    console.log(
-                        `%c[Formy: ${props.id ?? "anonymous"}] select changed [${target.name}]:`,
-                        "color: #ff8c00; font-weight: bold;",
-                        target.value
-                    );
+                    log(`[${props.id ?? "anonymous"}] select changed [${target.name}]:`, target.value);
                     persist.setValue(target.name, target.value);
                     runFieldValidation(target.name, target.value);
                 } else if (target instanceof HTMLInputElement && target.type === "file") {
-                    if (target.files) {
-                        console.log(
-                            `%c[Formy: ${props.id ?? "anonymous"}] file selected [${target.name}]:`,
-                            "color: #ff8c00; font-weight: bold;",
-                            Array.from(target.files)
-                        );
-                        savedFiles.current[target.name] = Array.from(target.files);
-                    }
+                    const filesList = target.files ? Array.from(target.files) : [];
+                    log(`[${props.id ?? "anonymous"}] file selected [${target.name}]:`, filesList);
+                    savedFiles.current[target.name] = filesList;
                 }
             }
         }
