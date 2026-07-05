@@ -2,14 +2,24 @@
 
 const validateEmail = (val: string) => {
     if (!val) return "Email is required";
-    if (!val.includes("@")) return "Invalid email format (must contain @)";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(val)) return "Invalid email format";
     return null;
 };
 
 const validatePassword = (val: string) => {
     if (!val) return "Password is required";
-    if (val.length < 6) return "Password must be at least 6 characters";
+    
+    const hasUppercase = /[A-Z]/.test(val);
+    const hasLowercase = /[a-z]/.test(val);
+    const hasNumber = /[0-9]/.test(val);
+    const hasSymbol = /[^A-Za-z0-9]/.test(val);
+    
+    if (val.length < 8 || !hasUppercase || !hasLowercase || !hasNumber || !hasSymbol) {
+        return "Password is too weak. It must be at least 8 characters long and contain uppercase, lowercase, numbers, and symbols.";
+    }
     return null;
 };
 
 export { validateEmail, validatePassword };
+
