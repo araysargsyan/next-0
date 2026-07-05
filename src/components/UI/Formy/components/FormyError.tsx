@@ -1,6 +1,6 @@
 'use client'
-import { useContext } from "react";
-import { FormyContext } from "./FormyContext";
+import { useContext, useEffect } from "react";
+import { FormyContext } from "../contexts/FormyContext";
 
 interface FormyErrorProps {
     field?: string;
@@ -9,17 +9,25 @@ interface FormyErrorProps {
     helpText?: string;
     parseMessage?: (message: string) => { title: string; info: string };
     absolute?: boolean;
+    validate?: (value: string) => string | null;
 }
 
-export default function FormyError({
+export function FormyError({
     field,
     below = false,
     hasHelp = false,
     helpText = "",
     parseMessage,
-    absolute = true // Keep it absolute by default to prevent layout shifts
+    absolute = true,
+    validate
 }: FormyErrorProps) {
-    const { state } = useContext(FormyContext);
+    const { state, registerValidator } = useContext(FormyContext);
+
+    useEffect(() => {
+        if (validate && field && registerValidator) {
+            return registerValidator(field, validate);
+        }
+    }, [field, validate, registerValidator]);
     const stateError = state && "error" in state ? state.error : null;
 
     let error: string | null = null;
@@ -28,12 +36,10 @@ export default function FormyError({
 
     if (stateError) {
         if (typeof stateError === "string") {
-            // Global error (render only if field prop is omitted)
             if (!field) {
                 error = stateError;
             }
         } else if (typeof stateError === "object") {
-            // Field-specific error (render only if field matches a key)
             if (field) {
                 error = stateError[field] ?? null;
             }
@@ -65,8 +71,6 @@ export default function FormyError({
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
             </svg>
-
-            {/* Tooltip: glassmorphism, shadow, smooth scale animation */}
             <span
                 className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5
                 bg-zinc-900/95 backdrop-blur-sm border border-zinc-800 text-zinc-100 text-[11px]
@@ -75,13 +79,11 @@ export default function FormyError({
                 transition-all duration-200 ease-out z-[99] font-normal"
             >
                 {infoText}
-                {/* Tooltip arrow */}
                 <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-900" />
             </span>
         </span>
     );
 
-    // IN-FLOW LAYOUT (If absolute prop is explicitly set to false)
     if (!absolute) {
         return (
             <div
@@ -102,7 +104,6 @@ export default function FormyError({
         );
     }
 
-    // ABSOLUTE LAYOUT (Default - positions error absolutely relative to parent relative wrapper)
     const topStyle = below ? "100%" : "0";
     const transformStyle = below
         ? (error ? "translateY(4px)" : "translateY(0px)")

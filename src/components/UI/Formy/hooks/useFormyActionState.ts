@@ -1,5 +1,5 @@
 import { useActionState, useState } from "react";
-import type { FormyActionState } from "./types";
+import type { FormyActionState } from "../types";
 
 export function useFormyActionState<State extends FormyActionState>(
     action: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>) | undefined,

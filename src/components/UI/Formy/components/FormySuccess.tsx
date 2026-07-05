@@ -1,6 +1,6 @@
 'use client'
 import { useContext, ReactNode } from "react";
-import { FormyContext } from "./FormyContext";
+import { FormyContext } from "../contexts/FormyContext";
 
 export function FormySuccess({ children }: { children: ReactNode }) {
     const { state } = useContext(FormyContext);

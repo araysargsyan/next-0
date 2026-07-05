@@ -2,13 +2,13 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 import { createFormStore } from "@/lib/store/formStore";
-import { createFormyPersistBridge } from "@/components/UI/Formy";
+import { createPersistBridge } from "@/components/UI/Formy";
 
 const FormStoreContext = createContext<ReturnType<typeof createFormStore> | null>(null);
 
-// Вызывается ОДИН РАЗ на уровне модуля, при загрузке файла —
-// не во время рендера какого-либо компонента.
-const FormyZustandBridge = createFormyPersistBridge((selector) => {
+// Called ONCE at module level during file load —
+// not during any component render.
+const FormyZustandBridge = createPersistBridge((selector) => {
     const context = useContext(FormStoreContext);
     if (!context) {
         throw new Error("useFormStore must be used within a FormStoreProvider");

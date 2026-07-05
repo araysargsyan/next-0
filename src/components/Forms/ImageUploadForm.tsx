@@ -1,7 +1,5 @@
 import { uploadImagesAction } from "@/app/(home)/actions";
-import Formy from "@/components/UI/Formy";
-import FormyError from "@/components/UI/Formy/FormyError";
-import { FormySubmit, FormySuccess } from "@/components/UI/Formy";
+import Formy, { FormyError, FormySubmit, FormySuccess } from "@/components/UI/Formy";
 
 export default function ImageUploadForm() {
     return (

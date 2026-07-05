@@ -24,7 +24,6 @@ export interface FormyProps<State extends FormyActionState & StrictFormyState<St
 export interface FormyStoreSlice {
     forms: Record<string, Record<string, string>>;
     setFormValue: (formId: string, name: string, value: string) => void;
-    setFormValues: (formId: string, values: Record<string, string>) => void;
     clearForm: (formId: string) => void;
 }
 

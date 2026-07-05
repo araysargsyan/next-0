@@ -1,14 +1,14 @@
 "use client";
 
-import {type ComponentProps, useContext} from "react";
-import { FormyContext } from "./FormyContext";
+import { type ComponentProps } from "react";
+import { useFormStatus } from "react-dom";
 
 interface FormySubmitProps extends ComponentProps<"button"> {
     loadingLabel?: string;
 }
 
 export function FormySubmit({ loadingLabel, children, className, style, ...props }: FormySubmitProps) {
-    const { isPending } = useContext(FormyContext);
+    const { pending: isPending } = useFormStatus();
 
     const resolvedStyle = {
         ...style,

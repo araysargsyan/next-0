@@ -6,7 +6,6 @@ export interface FormState {
 
 export interface FormActions {
     setFormValue: (formId: string, name: string, value: string) => void;
-    setFormValues: (formId: string, values: Record<string, string>) => void;
     clearForm: (formId: string) => void;
 }
 
@@ -29,21 +28,6 @@ export const createFormStore = (initialState: FormState = { forms: {} }) => {
                     `%c[FormStore] setFormValue → ${formId} [${name}]:`,
                     "color: #e066ff; font-weight: bold;",
                     value,
-                    "| Full state:",
-                    newForms
-                );
-                return { forms: newForms };
-            }),
-        setFormValues: (formId, values) =>
-            set((state) => {
-                const newForms = {
-                    ...state.forms,
-                    [formId]: values,
-                };
-                console.log(
-                    `%c[FormStore] setFormValues → ${formId}:`,
-                    "color: #32cd32; font-weight: bold;",
-                    values,
                     "| Full state:",
                     newForms
                 );

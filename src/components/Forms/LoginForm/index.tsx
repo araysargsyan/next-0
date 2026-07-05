@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import { signInAction } from "@/app/sign-in/actions";
-import Formy from "@/components/UI/Formy";
+import Formy, { FormyError, FormySubmit } from "@/components/UI/Formy";
 import InfoMessage from "./InfoMessage";
-import FormyError from "@/components/UI/Formy/FormyError";
-import { FormySubmit } from "@/components/UI/Formy";
 import { handleStateChange, parsePasswordMessage } from "./handlers";
+import {validateEmail, validatePassword} from "./validators";
 
 export const dynamic = "force-static";
 
@@ -32,7 +31,7 @@ export default function LoginForm() {
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                     required
                 />
-                <FormyError field="email" below />
+                <FormyError field="email" below validate={validateEmail} />
             </div>
 
             {/* Password Field Wrapper */}
@@ -50,7 +49,21 @@ export default function LoginForm() {
                     below
                     hasHelp
                     parseMessage={parsePasswordMessage}
+                    validate={validatePassword}
                 />
+            </div>
+
+            {/* Remember Me Checkbox Wrapper (Temporary) */}
+            <div className="flex items-center gap-2 mb-6">
+                <input
+                    id="remember"
+                    name="remember"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer select-none">
+                    Remember me
+                </label>
             </div>
 
             {/* Relative Wrapper for Global Error and Submit Button */}
