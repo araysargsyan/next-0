@@ -102,6 +102,8 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                 }
             });
             activeServerError = filtered;
+        } else if (typeof stateError === "string" && Object.keys(editedFields).length > 0) {
+            activeServerError = undefined;
         }
 
         return {
