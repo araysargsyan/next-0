@@ -39,6 +39,16 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     const validators = useRef<Record<string, (value: string) => string | null>>({});
     const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
 
+    // Track which fields have been edited by the user since the last submission
+    const [editedFields, setEditedFields] = useState<Record<string, boolean>>({});
+
+    const markFieldAsEdited = useCallback((name: string) => {
+        setEditedFields((prev) => {
+            if (prev[name]) return prev;
+            return { ...prev, [name]: true };
+        });
+    }, []);
+
     // Adjust state during render when state.success becomes true
     const [prevSuccess, setPrevSuccess] = useState(false);
     const currentSuccess = !!(state && "success" in state && state.success);
@@ -46,13 +56,23 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         setPrevSuccess(currentSuccess);
         if (currentSuccess && clearOnSuccess) {
             setClientErrors({});
+            setEditedFields({});
+        }
+    }
+
+    // Reset editedFields when a new submission starts (resolvedIsPending transitions false -> true)
+    const [prevIsPendingState, setPrevIsPendingState] = useState(false);
+    if (resolvedIsPending !== prevIsPendingState) {
+        setPrevIsPendingState(resolvedIsPending);
+        if (resolvedIsPending) {
+            setEditedFields({});
         }
     }
 
     console.log(
         `%c[Formy: ${props.id ?? "anonymous"}] 🔄 render`,
         "color: #00bfff; font-weight: bold;",
-        { state, resolvedIsPending, clientErrors }
+        { state, resolvedIsPending, clientErrors, editedFields }
     );
 
     const registerValidator = useCallback((name: string, validateFn: (value: string) => string | null) => {
@@ -67,21 +87,33 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         };
     }, [setClientErrors]);
 
-    // Merge server and client errors
+    // Merge server and client errors, filtering out server errors for edited fields
     const hasClientErrors = Object.keys(clientErrors).length > 0;
     const stateError = state && "error" in state ? state.error : undefined;
     const resolvedState: FormyActionState | null = useMemo(() => {
         if (!state && !hasClientErrors) return null;
+
+        let activeServerError = stateError;
+        if (typeof stateError === "object" && stateError !== null) {
+            const filtered: Record<string, string> = {};
+            Object.entries(stateError).forEach(([key, val]) => {
+                if (!editedFields[key]) {
+                    filtered[key] = val;
+                }
+            });
+            activeServerError = filtered;
+        }
+
         return {
             success: state ? state.success : false,
-            error: typeof stateError === "string"
-                ? stateError
+            error: typeof activeServerError === "string"
+                ? activeServerError
                 : {
-                    ...(typeof stateError === "object" && stateError !== null ? stateError : null),
+                    ...(typeof activeServerError === "object" && activeServerError !== null ? activeServerError : null),
                     ...clientErrors
                   }
         };
-    }, [state, hasClientErrors, stateError, clientErrors]);
+    }, [state, hasClientErrors, stateError, clientErrors, editedFields]);
 
     // Retrieve the persist hook from context (real implementation or no-op stub)
     // and call it unconditionally, as required by the Rules of Hooks.
@@ -272,14 +304,17 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             target instanceof HTMLTextAreaElement ||
             target instanceof HTMLSelectElement
         ) {
-            if (target.name && target.type !== "file" && target.type !== "checkbox" && target.type !== "radio") {
-                console.log(
-                    `%c[Formy: ${props.id ?? "anonymous"}] input [${target.name}]:`,
-                    "color: #ff8c00; font-weight: bold;",
-                    target.value
-                );
-                persist.setValue(target.name, target.value);
-                runFieldValidation(target.name, target.value);
+            if (target.name) {
+                markFieldAsEdited(target.name);
+                if (target.type !== "file" && target.type !== "checkbox" && target.type !== "radio") {
+                    console.log(
+                        `%c[Formy: ${props.id ?? "anonymous"}] input [${target.name}]:`,
+                        "color: #ff8c00; font-weight: bold;",
+                        target.value
+                    );
+                    persist.setValue(target.name, target.value);
+                    runFieldValidation(target.name, target.value);
+                }
             }
         }
         props.onInput?.(e);
@@ -294,6 +329,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             target instanceof HTMLSelectElement
         ) {
             if (target.name) {
+                markFieldAsEdited(target.name);
                 if (target instanceof HTMLInputElement && target.type === "checkbox") {
                     console.log(
                         `%c[Formy: ${props.id ?? "anonymous"}] checkbox changed [${target.name}]:`,
