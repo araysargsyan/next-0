@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useContext, SubmitEvent, InputEvent } from "react";
+import { useContext, useEffect, useRef } from "react";
+import type { SubmitEvent, InputEvent } from "react";
 import { useRouter } from "next/navigation";
 import Form from "next/form";
-import { FormyActionState, StrictFormyState, FormyProps } from "./types";
+import type { FormyActionState, StrictFormyState, FormyProps } from "./types";
 import { FormyContext } from "./FormyContext";
+import { FormyPersistContext } from "./FormyPersistContext";
 import { useFormyActionState } from "./useFormyActionState";
-import {FormStoreContext, useFormStore} from "@/components/Providers/FormStoreProvider";
 
 export * from "./types";
 export * from "./FormyContext";
+export * from "./FormyPersistContext";
+export * from "./createPersistBridge";
 export * from "./useFormyActionState";
 export * from "./FormySubmit";
 export * from "./FormySuccess";
@@ -21,8 +24,7 @@ function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSe
 
     if (nativeSetter) {
         nativeSetter.call(element, value);
-        const event = new Event("input", { bubbles: true });
-        element.dispatchEvent(event);
+        element.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
         element.value = value;
     }
@@ -36,13 +38,11 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     className = "flex flex-col gap-4 w-full max-w-sm",
     submitLabel,
     loadingLabel = "Loading...",
+    clearOnSuccess = true,
     ...props
 }: FormyProps<State>) {
     const router = useRouter();
-    const [state, formAction, isPending] = useFormyActionState<State>(
-        action,
-        initialState
-    );
+    const [state, formAction, isPending] = useFormyActionState<State>(action, initialState);
 
     const resolvedState = state;
     const resolvedFormAction = formAction || "";
@@ -52,13 +52,27 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     const savedValues = useRef<Record<string, string>>({});
     const isRestoring = useRef(false);
     const prevIsPending = useRef(resolvedIsPending);
+    const hasHydrated = useRef(false);
 
-    // Zustand integration
-    const id = props.id;
-    const store = useContext(FormStoreContext);
-    const storeValues = useFormStore((s) => (id ? s.forms[id] : undefined));
-    const setFormValue = useFormStore((s) => s.setFormValue);
-    const clearForm = useFormStore((s) => s.clearForm);
+    // Достаём persist-хук из контекста (реальная реализация или no-op заглушка)
+    // и сразу вызываем его — безусловно, ровно как требуют Rules of Hooks.
+    const usePersist = useContext(FormyPersistContext);
+    const persist = usePersist(props.id ?? "");
+    const persistRef = useRef(persist);
+
+    function restoreFromValues(formEl: HTMLFormElement, values: Record<string, string>) {
+        if (Object.keys(values).length === 0) return;
+        formEl.querySelectorAll("input, textarea, select").forEach((el) => {
+            const input = el as HTMLInputElement;
+            if (input.name && values[input.name] !== undefined) {
+                setNativeValue(input, values[input.name]);
+            }
+        });
+    }
+
+    useEffect(() => {
+        persistRef.current = persist;
+    });
 
     useEffect(() => {
         if (onStateChange && state !== null) {
@@ -66,32 +80,35 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         }
     }, [state, onStateChange, router]);
 
-    // Restore form values from the global store on mount
+    // Гидратация значений из persist-адаптера при монтировании (один раз)
     useEffect(() => {
-        if (id && store && formRef.current) {
-            const initialValues = store.getState().forms[id];
-            if (initialValues && Object.keys(initialValues).length > 0) {
-                isRestoring.current = true;
-                const inputs = formRef.current.querySelectorAll("input, textarea, select");
-                inputs.forEach((input) => {
-                    const htmlInput = input as HTMLInputElement;
-                    const name = htmlInput.name;
-                    if (name && initialValues[name] !== undefined) {
-                        setNativeValue(htmlInput, initialValues[name]);
-                    }
-                });
-                isRestoring.current = false;
-            }
-        }
-    }, [id, store]);
+        if (hasHydrated.current) return;
+        hasHydrated.current = true;
 
-    // Restore form values after Action/RSC Refresh resets them on error
+        if (persist.values && formRef.current && Object.keys(persist.values).length > 0) {
+            isRestoring.current = true;
+            formRef.current.querySelectorAll("input, textarea, select").forEach((el) => {
+                const input = el as HTMLInputElement;
+                if (input.name && persist.values![input.name] !== undefined) {
+                    setNativeValue(input, persist.values![input.name]);
+                }
+            });
+            isRestoring.current = false;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Восстановление значений после того, как action отработал (RSC/Server Action reset)
     useEffect(() => {
         if (resolvedState && "success" in resolvedState && resolvedState.success) {
-            if (id) {
-                clearForm(id);
+            if (clearOnSuccess) {
+                persistRef.current.clear();
+                savedValues.current = {};
+            } else if (formRef.current) {
+                isRestoring.current = true;
+                restoreFromValues(formRef.current, persistRef.current.values ?? savedValues.current);
+                isRestoring.current = false;
             }
-            savedValues.current = {};
             prevIsPending.current = resolvedIsPending;
             return;
         }
@@ -99,22 +116,12 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         const didTransitionEnd = prevIsPending.current && !resolvedIsPending;
         prevIsPending.current = resolvedIsPending;
 
-        if (didTransitionEnd) {
-            const valuesToRestore = id && storeValues ? storeValues : savedValues.current;
-            if (formRef.current && Object.keys(valuesToRestore).length > 0) {
-                isRestoring.current = true;
-                const inputs = formRef.current.querySelectorAll("input, textarea, select");
-                inputs.forEach((input) => {
-                    const htmlInput = input as HTMLInputElement;
-                    const name = htmlInput.name;
-                    if (name && valuesToRestore[name] !== undefined) {
-                        setNativeValue(htmlInput, valuesToRestore[name]);
-                    }
-                });
-                isRestoring.current = false;
-            }
+        if (didTransitionEnd && formRef.current) {
+            isRestoring.current = true;
+            restoreFromValues(formRef.current, persistRef.current.values ?? savedValues.current);
+            isRestoring.current = false;
         }
-    }, [resolvedState, resolvedIsPending, id, storeValues, clearForm]);
+    }, [resolvedState, resolvedIsPending, clearOnSuccess]);
 
     const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
         if (formRef.current) {
@@ -127,22 +134,16 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             });
             savedValues.current = values;
         }
-        if (props.onSubmit) {
-            props.onSubmit(e);
-        }
+        props.onSubmit?.(e);
     };
 
     const handleInput = (e: InputEvent<HTMLFormElement>) => {
         if (isRestoring.current) return;
-        if (id) {
-            const target = e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-            if (target && target.name && target.type !== "file") {
-                setFormValue(id, target.name, target.value);
-            }
+        const target = e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+        if (target?.name && target.type !== "file") {
+            persist.setValue(target.name, target.value);
         }
-        if (props.onInput) {
-            props.onInput(e);
-        }
+        props.onInput?.(e);
     };
 
     return (

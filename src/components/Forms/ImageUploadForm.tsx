@@ -10,6 +10,7 @@ export default function ImageUploadForm() {
             <Formy
                 id="image-upload-form"
                 action={uploadImagesAction}
+                clearOnSuccess={false}
                 className="relative flex flex-col"
             >
                 {/* Product Name Wrapper */}

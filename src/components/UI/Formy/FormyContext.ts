@@ -1,7 +1,12 @@
 import { createContext } from "react";
-import { FormyActionState } from "./types";
+import type { FormyActionState } from "./types";
 
-export const FormyContext = createContext<{ state: FormyActionState | null; isPending: boolean }>({
+export interface FormyContextValue {
+    state: FormyActionState | null;
+    isPending: boolean;
+}
+
+export const FormyContext = createContext<FormyContextValue>({
     state: null,
-    isPending: false
+    isPending: false,
 });
