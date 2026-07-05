@@ -9,7 +9,7 @@ import type { FormyPersistAdapter } from "../types";
 export type FormyPersistHook = (formId: string) => FormyPersistAdapter;
 
 const noopPersistHook: FormyPersistHook = () => ({
-    values: undefined,
+    getValues: () => undefined,
     setValue: () => {},
     clear: () => {},
 });

@@ -1,8 +1,8 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 import { FormyPersistContext } from "../contexts/FormyPersistContext";
-import { FormyStoreSlice, UseStoreHook } from "../types";
+import { FormyStoreSlice, GetStateFn } from "../types";
 import { usePersistedForm } from "../hooks/usePersistedForm";
 
 /**
@@ -15,14 +15,19 @@ import { usePersistedForm } from "../hooks/usePersistedForm";
  * into the generic contract that Formy understands.
  *
  * Usage:
- *   const FormyZustandBridge = createPersistBridge(useFormStore);
+ *   const FormyZustandBridge = createPersistBridge(() => useContext(StoreContext).getState);
  */
 export function createPersistBridge<Store extends FormyStoreSlice>(
-    useStoreHook: UseStoreHook<Store>
+    useGetState: () => GetStateFn<Store>
 ) {
     return function FormyPersistBridge({ children }: { children: ReactNode }) {
+        const getState = useGetState();
+        const persistHook = useMemo(
+            () => usePersistedForm.bind(null, getState),
+            [getState]
+        );
         return (
-            <FormyPersistContext.Provider value={usePersistedForm.bind(null, useStoreHook)}>
+            <FormyPersistContext.Provider value={persistHook}>
                 {children}
             </FormyPersistContext.Provider>
         );

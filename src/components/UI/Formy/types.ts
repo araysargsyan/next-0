@@ -14,8 +14,8 @@ export interface FormyProps<State extends FormyActionState & StrictFormyState<St
     extends Omit<ComponentProps<typeof Form>, "children" | "action"> {
     action?: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>);
     initialState?: Awaited<State> | null;
-    children?: ReactNode | ((state: Awaited<State> | null, isPending: boolean) => ReactNode);
-    onStateChange?: (state: Awaited<State> | null, router: ReturnType<typeof useRouter>) => void;
+    children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
+    onStateChange?: (state: State | null, router: ReturnType<typeof useRouter>) => void;
     submitLabel?: string;
     loadingLabel?: string;
     clearOnSuccess?: boolean;
@@ -28,9 +28,9 @@ export interface FormyStoreSlice {
 }
 
 export interface FormyPersistAdapter {
-    values: Record<string, string> | undefined;
+    getValues: () => Record<string, string> | undefined;
     setValue: (name: string, value: string) => void;
     clear: () => void;
 }
 
-export type UseStoreHook<Store extends FormyStoreSlice = FormyStoreSlice> = <T>(selector: (state: Store) => T) => T
+export type GetStateFn<Store extends FormyStoreSlice = FormyStoreSlice> = () => Store;

@@ -1,6 +1,11 @@
-'use client'
-import { useContext, useEffect } from "react";
+"use client";
+
+import { useContext, useEffect, useState } from "react";
 import { FormyContext } from "../contexts/FormyContext";
+import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("FormyError", "magenta");
 
 interface FormyErrorProps {
     field?: string;
@@ -22,27 +27,39 @@ export function FormyError({
     validate
 }: FormyErrorProps) {
     const { state, registerValidator } = useContext(FormyContext);
+    const [clientError, setClientError] = useState<string | null>(null);
+
+    useIsomorphicLayoutEffect(() => {
+        log(`[${field ?? "global"}] 🔄 render`, { clientError, state });
+    });
 
     useEffect(() => {
-        if (validate && field && registerValidator) {
-            return registerValidator(field, validate);
+        log(`[${field ?? "global"}] 📝 clientError changed:`, clientError ?? "null");
+    }, [clientError, field]);
+
+    useEffect(() => {
+        if (!registerValidator) return;
+
+        if (validate && field) {
+            const setErrorFn = (err: string | null) => setClientError(err);
+            return registerValidator(field, validate, setErrorFn);
+        } else if (!field) {
+            return registerValidator("__global__", () => null, () => {});
         }
     }, [field, validate, registerValidator]);
-    const stateError = state && "error" in state ? state.error : null;
 
+    const stateError = state && "error" in state ? state.error : null;
     let error: string | null = null;
     let titleText = "";
     let infoText = helpText;
 
-    if (stateError) {
-        if (typeof stateError === "string") {
-            if (!field) {
-                error = stateError;
-            }
-        } else if (typeof stateError === "object") {
-            if (field) {
-                error = stateError[field] ?? null;
-            }
+    if (clientError) {
+        error = clientError;
+    } else if (stateError) {
+        if (typeof stateError === "string" && !field) {
+            error = stateError;
+        } else if (typeof stateError === "object" && field) {
+            error = stateError[field] ?? null;
         }
     }
 

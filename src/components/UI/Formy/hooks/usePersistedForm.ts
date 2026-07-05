@@ -1,22 +1,18 @@
 "use client";
 
-import type { FormyStoreSlice, UseStoreHook } from "../types";
+import type { FormyStoreSlice, FormyPersistAdapter, GetStateFn } from "../types";
 
 export function usePersistedForm<Store extends FormyStoreSlice>(
-    useStoreHook: UseStoreHook<Store>,
+    getState: GetStateFn<Store>,
     formId: string
-) {
-    const values = useStoreHook((s) => formId ? s.forms[formId] : undefined);
-    const setFormValue = useStoreHook((s) => s.setFormValue);
-    const clearForm = useStoreHook((s) => s.clearForm);
-
+): FormyPersistAdapter {
     return {
-        values,
+        getValues: () => formId ? getState().forms[formId] : undefined,
         setValue: (name: string, value: string) => {
-            if (formId) setFormValue(formId, name, value);
+            if (formId) getState().setFormValue(formId, name, value);
         },
         clear: () => {
-            if (formId) clearForm(formId);
+            if (formId) getState().clearForm(formId);
         },
     };
 }

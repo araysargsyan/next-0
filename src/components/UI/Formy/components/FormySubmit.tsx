@@ -2,6 +2,10 @@
 
 import { type ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
+import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("FormySubmit", "blue");
 
 interface FormySubmitProps extends ComponentProps<"button"> {
     loadingLabel?: string;
@@ -9,6 +13,10 @@ interface FormySubmitProps extends ComponentProps<"button"> {
 
 export function FormySubmit({ loadingLabel, children, className, style, ...props }: FormySubmitProps) {
     const { pending: isPending } = useFormStatus();
+
+    useIsomorphicLayoutEffect(() => {
+        log(`🔄 render`, { isPending });
+    });
 
     const resolvedStyle = {
         ...style,
