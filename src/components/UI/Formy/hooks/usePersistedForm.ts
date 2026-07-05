@@ -1,3 +1,5 @@
+"use client";
+
 import type { FormyStoreSlice, UseStoreHook } from "../types";
 
 export function usePersistedForm<Store extends FormyStoreSlice>(
