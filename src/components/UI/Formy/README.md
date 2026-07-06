@@ -28,6 +28,14 @@ The community workarounds are unsatisfying:
 
 Formy intercepts the form's `onSubmit` event to **snapshot all input values** before the Server Action fires. After the action completes on error, it **imperatively restores those values directly in the DOM** — bypassing React 19's automatic `form.reset()`.
 
+### The Zero-Rerender Architecture
+Formy guarantees absolute minimal rendering footprint via a decoupled architecture:
+1. **`Formy` (Orchestrator):** Manages `useActionState` and initializes lightweight external stores. It does *not* render the form DOM itself.
+2. **`FormyCore` (DOM Layer):** Handles the `<form>` events and DOM restoration.
+3. **`FormyError` (Local State):** Subscribes directly to an external `ErrorsStore` and handles real-time client validation locally.
+
+**Result:** Typing in one input or receiving a server validation error *never* triggers a re-render of the parent `<Formy>` component or sibling inputs.
+
 For cross-navigation persistence, Formy integrates with an optional global store (Zustand by default) via a **store-agnostic bridge** — so your store choice doesn't matter.
 
 This means:

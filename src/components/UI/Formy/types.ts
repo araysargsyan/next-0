@@ -1,4 +1,4 @@
-import { ReactNode, ComponentProps } from "react";
+import {ReactNode, ComponentProps, RefObject} from "react";
 import { useRouter } from "next/navigation";
 import Form from "next/form";
 
@@ -34,3 +34,21 @@ export interface FormyPersistAdapter {
 }
 
 export type GetStateFn<Store extends FormyStoreSlice = FormyStoreSlice> = () => Store;
+
+export interface FormyCoreProps<State extends FormyActionState & StrictFormyState<State>> extends Omit<
+    FormyProps<State>,
+    'children' | 'action' | 'initialState' | 'onStateChange' | 'submitLabel' | 'loadingLabel' | 'clearOnSuccess'
+> {
+    children: ReactNode;
+    clearFieldError: (name: string) => void;
+    formAction: ComponentProps<typeof Form>['action'] | undefined;
+    setValue: (name: string, value: string) => void;
+    validatorsRef: RefObject<Record<string, {
+        validate: (value: string) => string | null;
+        setError: (error: string | null) => void;
+    }>>;
+    formRef: RefObject<HTMLFormElement | null>;
+    savedFilesRef: RefObject<Record<string, File[]>>;
+    savedValuesRef: RefObject<Record<string, string>>;
+    isRestoringRef: RefObject<boolean>;
+}

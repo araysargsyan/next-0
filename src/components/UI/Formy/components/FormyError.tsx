@@ -1,12 +1,11 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
-import { FormyContext } from "../contexts/FormyContext";
+import { useEffect, useState } from "react";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/lib/logger";
 import {useErrorsContext} from "@/components/UI/Formy/contexts/ErrorsContext";
 
-const log = createLogger("FormyError", "magenta");
+const log = createLogger("FormyError", "red");
 
 interface FormyErrorProps {
     field?: string;
