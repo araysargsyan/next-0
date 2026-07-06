@@ -1,14 +1,15 @@
 "use client";
 
-import { useActionState, useState, useCallback, type Dispatch, type SetStateAction } from "react";
+import {useActionState, useState, useCallback, type Dispatch, type SetStateAction, ComponentProps} from "react";
 import type { FormyActionState } from "../types";
+import Form from "next/form";
 
 export function useFormyActionState<State extends FormyActionState>(
     action: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>) | undefined,
     initialState: Awaited<State> | null
 ): [
     state: State | null,
-    dispatch: string | undefined | ((payload: FormData) => void),
+    dispatch: ComponentProps<typeof Form>['action'] | null,
     isPending: boolean | null,
     setState: Dispatch<SetStateAction<State | null>>
 ] {
@@ -40,6 +41,6 @@ export function useFormyActionState<State extends FormyActionState>(
         const [_, dispatch, isPending] = useActionState(wrappedAction, initialState);
         return [state, dispatch, isPending, setState];
     } else {
-        return [state, action, null, setState];
+        return [state, action || null, null, setState];
     }
 }

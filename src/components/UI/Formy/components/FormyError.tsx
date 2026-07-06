@@ -4,6 +4,7 @@ import { useContext, useEffect, useState } from "react";
 import { FormyContext } from "../contexts/FormyContext";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/lib/logger";
+import {useErrorsContext} from "@/components/UI/Formy/contexts/ErrorsContext";
 
 const log = createLogger("FormyError", "magenta");
 
@@ -18,7 +19,7 @@ interface FormyErrorProps {
 }
 
 export function FormyError({
-    field,
+    field = '__global__',
     below = false,
     hasHelp = false,
     helpText = "",
@@ -26,11 +27,11 @@ export function FormyError({
     absolute = true,
     validate
 }: FormyErrorProps) {
-    const { state, registerValidator } = useContext(FormyContext);
+    const {error: stateError, registerValidator} = useErrorsContext(field);
     const [clientError, setClientError] = useState<string | null>(null);
 
     useIsomorphicLayoutEffect(() => {
-        log(`[${field ?? "global"}] 🔄 render`, { clientError, state });
+        log(`[${field ?? "global"}] 🔄 render`, { clientError, stateError });
     });
 
     useEffect(() => {
@@ -48,20 +49,9 @@ export function FormyError({
         }
     }, [field, validate, registerValidator]);
 
-    const stateError = state && "error" in state ? state.error : null;
-    let error: string | null = null;
+    const error = clientError ? clientError : stateError;
     let titleText = "";
     let infoText = helpText;
-
-    if (clientError) {
-        error = clientError;
-    } else if (stateError) {
-        if (typeof stateError === "string" && !field) {
-            error = stateError;
-        } else if (typeof stateError === "object" && field) {
-            error = stateError[field] ?? null;
-        }
-    }
 
     if (error) {
         if (parseMessage) {
