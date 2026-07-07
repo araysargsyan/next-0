@@ -4,10 +4,11 @@ import { protFetch } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { createLogger } from "@/lib/logger";
 import { parseApiError } from "@/lib/utils/error";
+import {FormyActionState} from "@/components/UI/Formy";
 
 const log = createLogger('UploadAction', 'magenta');
 
-export async function uploadImagesAction(_prevState: unknown, formData: FormData) {
+export async function uploadImagesAction(_prevState: unknown, formData: FormData): Promise<FormyActionState> {
     const name = formData.get("name") as string;
     log(`[START]: (${name || 'unknown'})`, "Processing image upload...");
 
@@ -26,7 +27,6 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
     // Append string fields
     formDataToUpload.append("name", name);
     formDataToUpload.append("price", price);
-    console.log(666, price)
     // Append files
     files.forEach((file) => {
         formDataToUpload.append("images", file);

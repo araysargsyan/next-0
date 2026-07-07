@@ -21,8 +21,6 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     children,
     onStateChange,
     className = "flex flex-col gap-4 w-full max-w-sm",
-    submitLabel,
-    loadingLabel = "Loading...",
     clearOnSuccess = true,
     ...props
 }: FormyProps<State>) {
@@ -179,15 +177,6 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                 {...props}
             >
                 {typeof children === "function" ? children(state, formyContextValue.isPending) : children}
-                {submitLabel && (
-                    <button
-                        type="submit"
-                        disabled={formyContextValue.isPending}
-                        className="bg-black text-white rounded-lg px-4 py-2 hover:opacity-80 transition-opacity disabled:opacity-50"
-                    >
-                        {formyContextValue.isPending ? loadingLabel : submitLabel}
-                    </button>
-                )}
             </FormyCore>
         </FormyContext.Provider>
     </ErrosContext.Provider>

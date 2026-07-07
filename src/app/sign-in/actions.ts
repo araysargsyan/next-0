@@ -4,10 +4,11 @@ import { API_URL } from "@/config";
 import { AuthService } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
 import { parseApiError, ParsedApiError } from "@/lib/utils/error";
+import {FormyActionState} from "@/components/UI/Formy";
 
 const log = createLogger('SignInAction', 'magenta');
 
-export async function signInAction(_: unknown, formData: FormData) {
+export async function signInAction(_prevState: unknown, formData: FormData): Promise<FormyActionState> {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     log(`[START]: (${email})`, { email });
@@ -21,7 +22,7 @@ export async function signInAction(_: unknown, formData: FormData) {
 
         if (!res.ok) {
             log(`[ERROR]: (${email}) ->`, "Invalid credentials or backend error", { status: res.status });
-            
+
             let errorMessage: ParsedApiError = "Something went wrong. Please try again later.";
             try {
                 const errBody = await res.json();

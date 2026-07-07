@@ -1,4 +1,5 @@
 import { createStore } from "zustand/vanilla";
+import {createLogger} from "@/lib/logger";
 
 export interface FormState {
     forms: Record<string, Record<string, string>>;
@@ -11,6 +12,8 @@ export interface FormActions {
 
 export type FormStore = FormState & FormActions;
 
+const log = createLogger("FormyStore", "green");
+
 export const createFormStore = (initialState: FormState = { forms: {} }) => {
     return createStore<FormStore>()((set) => ({
         ...initialState,
@@ -20,30 +23,21 @@ export const createFormStore = (initialState: FormState = { forms: {} }) => {
                     ...(state.forms[formId] || {}),
                     [name]: value,
                 };
-                const newForms = {
+                const newState = {
                     ...state.forms,
                     [formId]: updatedForm,
                 };
-                console.log(
-                    `%c[FormStore] setFormValue → ${formId} [${name}]:`,
-                    "color: #e066ff; font-weight: bold;",
-                    value,
-                    "| Full state:",
-                    newForms
-                );
-                return { forms: newForms };
+
+                log(`[${formId}] setFormValue`, {formId, name, value, newState});
+                return { forms: newState };
             }),
         clearForm: (formId) =>
             set((state) => {
-                const newForms = { ...state.forms };
-                delete newForms[formId];
-                console.log(
-                    `%c[FormStore] clearForm → ${formId}`,
-                    "color: #ff4500; font-weight: bold;",
-                    "| Full state:",
-                    newForms
-                );
-                return { forms: newForms };
+                const newState = { ...state.forms };
+                delete newState[formId];
+
+                log(`[${formId}] clearForm`, {formId, newState});
+                return { forms: newState };
             }),
     }));
 };

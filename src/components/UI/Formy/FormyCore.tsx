@@ -1,15 +1,12 @@
-"use client";
-
-import { useCallback } from "react";
+import {memo} from "react";
 import type { SubmitEvent, InputEvent, ChangeEvent } from "react";
 import Form from "next/form";
 import type { FormyActionState, StrictFormyState, FormyCoreProps } from "./types";
-import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/lib/logger";
 
-const log = createLogger("FormyCore", "cyan");
 
-export const FormyCore = <State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
+const log = createLogger("FormyCore", "cyan");
+const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
     children,
     className = "flex flex-col gap-4 w-full max-w-sm",
     clearFieldError,
@@ -22,18 +19,18 @@ export const FormyCore = <State extends FormyActionState & StrictFormyState<Stat
     validatorsRef,
     ...props
 }: FormyCoreProps<State>) => {
-    useIsomorphicLayoutEffect(() => {
-        log(`[${props.id ?? "anonymous"}] 🔄 FormyCore render`);
-    });
+    // useIsomorphicLayoutEffect(() => {
+    //     log(`[${props.id ?? "anonymous"}] 🔄 FormyCore render`);
+    // });
 
-    const runFieldValidation = useCallback((name: string, value: string) => {
+    const runFieldValidation = (name: string, value: string) => {
         const entry = validatorsRef.current[name];
         if (entry) {
             const error = entry.validate(value);
             log(`[${props.id ?? "anonymous"}] validate [${name}]:`, error ? `FAILED (${error})` : "PASSED");
             entry.setError(error);
         }
-    }, [props.id, validatorsRef]);
+    }
 
     const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
         if (formRef.current) {
@@ -156,3 +153,5 @@ export const FormyCore = <State extends FormyActionState & StrictFormyState<Stat
         {children}
     </form>
 }
+
+export const FormyCore = memo<typeof FormyCoreInner>(FormyCoreInner);

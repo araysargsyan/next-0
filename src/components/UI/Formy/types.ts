@@ -3,8 +3,8 @@ import { useRouter } from "next/navigation";
 import Form from "next/form";
 
 export type FormyActionState =
-    | { success: boolean; error?: string | Record<string, string> | null }
-    | { success: boolean; data?: unknown };
+    | { success: false; error?: string | Record<string, string> | null }
+    | { success: true; data?: unknown };
 
 export type StrictFormyState<T> = {
     [K in keyof T]: K extends "error" | "success" | "data" ? T[K] : never
@@ -16,8 +16,8 @@ export interface FormyProps<State extends FormyActionState & StrictFormyState<St
     initialState?: Awaited<State> | null;
     children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
     onStateChange?: (state: State | null, router: ReturnType<typeof useRouter>) => void;
-    submitLabel?: string;
-    loadingLabel?: string;
+    // submitLabel?: string;
+    // loadingLabel?: string;
     clearOnSuccess?: boolean;
 }
 
