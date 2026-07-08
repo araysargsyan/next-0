@@ -1,13 +1,14 @@
 import {memo, useEffect, useRef, useCallback} from "react";
 import type { SubmitEvent, InputEvent, ChangeEvent } from "react";
 import Form from "next/form";
-import type { FormyActionState, StrictFormyState, FormyCoreProps } from "./types";
+import type { FormyCoreProps } from "./types";
 import { createLogger } from "@/libs/utils/logger";
 import { setNativeValue, setNativeChecked } from "./utils/domHelpers";
+import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 
 const log = createLogger("FormyCore", "cyan");
 
-const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
+const FormyCoreInner = ({
     children,
     className = "flex flex-col gap-4 w-full max-w-sm",
     clearFieldError,
@@ -16,26 +17,62 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
     setValue,
     validatorsRef,
     persist,
-    state,
-    isPending,
-    clearOnSuccess,
+    onActionChangeRef,
     id,
-    onLoad,
     ...props
-}: FormyCoreProps<State> & { id?: string }) => {
-    const prevIsPending = useRef(isPending);
-    const savedValuesRef = useRef<Record<string, string>>({});
-    const savedFilesRef = useRef<Record<string, File[]>>({});
-    const isRestoringRef = useRef(false);
-    const hasHydrated = useRef(false);
-    const persistRef = useRef(persist);
+}: FormyCoreProps & { id?: string }) => {
+    useIsomorphicLayoutEffect(()=>{
+        log(`[${id ?? "anonymous"}] 🔄 FormyCoreInner render`);
+    })
+    const fieldsetRef = useRef<HTMLFieldSetElement>(null);
+    const localState = useRef({
+        /**
+         * Snapshot of all form field values (name → value) captured
+         * at submit time in `handleSubmit`. Fallback source for DOM
+         * restoration when the persist store is not connected
+         * (i.e. `persist.getValues()` returns `undefined`).
+         */
+        savedValues: {} as Record<string, string>,
+
+        /**
+         * Snapshot of File objects per file-input name, captured in
+         * `handleChange`. Browsers block programmatic `.value` setting
+         * on file inputs — we restore them via DataTransfer API.
+         */
+        savedFiles: {} as Record<string, File[]>,
+
+        /**
+         * Guard flag, `true` while `restoreFromValues` is running.
+         * Prevents infinite loop: `setNativeValue` dispatches synthetic
+         * events → `handleInput`/`handleChange` would re-save values
+         * being restored without this guard.
+         */
+        isRestoring: false,
+
+        /**
+         * `true` after initial mount hydration from the persist store.
+         * Prevents double-hydration in React Strict Mode (dev),
+         * where mount effects fire twice.
+         */
+        hasHydrated: false,
+
+        /**
+         * Always-fresh reference to the `persist` adapter prop.
+         * Stored here so callbacks/effects read the latest adapter
+         * without needing `persist` in dependency arrays.
+         */
+        persist: persist,
+    });
 
     useEffect(() => {
-        onLoad?.();
-    }, [onLoad]);
+        log(`[${id ?? "anonymous"}] FormyCore loaded, enabling fieldset`);
+        if (fieldsetRef.current) {
+            fieldsetRef.current.disabled = false;
+        }
+    }, [id]);
 
     useEffect(() => {
-        persistRef.current = persist;
+        localState.current.persist = persist;
     });
 
 
@@ -61,7 +98,7 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
         // Restore file inputs from the local ref using DataTransfer
         formEl.querySelectorAll('input[type="file"]').forEach((el) => {
             if (el instanceof HTMLInputElement) {
-                const files = savedFilesRef.current[el.name];
+                const files = localState.current.savedFiles[el.name];
                 if (files && files.length > 0) {
                     try {
                         const dt = new DataTransfer();
@@ -78,50 +115,64 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
 
     // Hydrate field values from the persist adapter on mount
     useEffect(() => {
-        if (hasHydrated.current) return;
-        hasHydrated.current = true;
+        if (localState.current.hasHydrated) return;
+        localState.current.hasHydrated = true;
 
-        const values = persistRef.current.getValues();
+        const values = localState.current.persist.getValues();
         if (values && formRef.current && Object.keys(values).length > 0) {
             log(`[${id ?? "anonymous"}] mount hydration: restoring from store`, values);
-            isRestoringRef.current = true;
+            localState.current.isRestoring = true;
             restoreFromValues(formRef.current, values);
-            isRestoringRef.current = false;
+            localState.current.isRestoring = false;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Restore field values after the action completes (RSC / Server Action reset)
+    // Register action change handler — Formy calls this from its useEffect
     useEffect(() => {
-        if (state && "data" in state) {
-            if (clearOnSuccess) {
-                log(`[${id ?? "anonymous"}] action succeeded, clearing state`);
-                persistRef.current.clear();
-                savedValuesRef.current = {};
-                savedFilesRef.current = {};
-            } else if (formRef.current) {
-                log(`[${id ?? "anonymous"}] action succeeded, restoring final values`);
-                isRestoringRef.current = true;
-                restoreFromValues(formRef.current, persistRef.current.getValues() ?? savedValuesRef.current);
-                isRestoringRef.current = false;
+        let isActionEnded = false;
+
+        onActionChangeRef.current = (state, isPending, clearOnSuccess) => {
+            // Action is running — arm the flag for when it completes
+            if (isPending) {
+                isActionEnded = true;
+                return;
             }
-            prevIsPending.current = isPending;
-            return;
-        }
 
-        const didTransitionEnd = prevIsPending.current && !isPending;
-        prevIsPending.current = isPending;
+            // Consume the flag (read + reset)
+            const actionEnded = isActionEnded;
+            isActionEnded = false;
 
-        if (didTransitionEnd && formRef.current) {
-            log(
-                `[${id ?? "anonymous"}] transition ended, restoring values`,
-                persistRef.current.getValues() ?? savedValuesRef.current
-            );
-            isRestoringRef.current = true;
-            restoreFromValues(formRef.current, persistRef.current.getValues() ?? savedValuesRef.current);
-            isRestoringRef.current = false;
-        }
-    }, [clearOnSuccess, isPending, state, id, restoreFromValues, formRef]);
+            if (state && "data" in state) {
+                if (clearOnSuccess) {
+                    log(`[${id ?? "anonymous"}] action succeeded, clearing state`);
+                    localState.current.persist.clear();
+                    localState.current.savedValues = {};
+                    localState.current.savedFiles = {};
+                } else if (formRef.current) {
+                    log(`[${id ?? "anonymous"}] action succeeded, restoring final values`);
+                    localState.current.isRestoring = true;
+                    restoreFromValues(formRef.current, localState.current.persist.getValues() ?? localState.current.savedValues);
+                    localState.current.isRestoring = false;
+                }
+                return;
+            }
+
+            if (actionEnded && formRef.current) {
+                log(
+                    `[${id ?? "anonymous"}] action ended, restoring values`,
+                    localState.current.persist.getValues() ?? localState.current.savedValues
+                );
+                localState.current.isRestoring = true;
+                restoreFromValues(formRef.current, localState.current.persist.getValues() ?? localState.current.savedValues);
+                localState.current.isRestoring = false;
+            }
+        };
+
+        return () => {
+            onActionChangeRef.current = null;
+        };
+    }, [id, formRef, restoreFromValues, onActionChangeRef]);
 
     const runFieldValidation = (name: string, value: string) => {
         const entry = validatorsRef.current[name];
@@ -151,14 +202,14 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
                     values[key] = val;
                 }
             });
-            savedValuesRef.current = values;
+            localState.current.savedValues = values;
 
             log(`[${id ?? "anonymous"}] submitting form`, values);
 
             // Run client-side validation on submission
             let hasErrors = false;
             Object.entries(validatorsRef.current).forEach(([name, entry]) => {
-                const error = entry.validate(savedValuesRef.current[name] ?? "");
+                const error = entry.validate(localState.current.savedValues[name] ?? "");
                 entry.setError(error);
                 if (error) {
                     hasErrors = true;
@@ -175,7 +226,7 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
     };
 
     const handleInput = (e: InputEvent<HTMLFormElement>) => {
-        if (isRestoringRef.current) return;
+        if (localState.current.isRestoring) return;
         const target = e.target;
         if (
             target instanceof HTMLInputElement ||
@@ -195,7 +246,7 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
     };
 
     const handleChange = (e: ChangeEvent<HTMLFormElement>) => {
-        if (isRestoringRef.current) return;
+        if (localState.current.isRestoring) return;
         const target = e.target;
         if (
             target instanceof HTMLInputElement ||
@@ -221,7 +272,7 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
                 } else if (target instanceof HTMLInputElement && target.type === "file") {
                     const filesList = target.files ? Array.from(target.files) : [];
                     log(`[${id ?? "anonymous"}] file selected [${target.name}]:`, filesList);
-                    savedFilesRef.current[target.name] = filesList;
+                    localState.current.savedFiles[target.name] = filesList;
                 }
             }
         }
@@ -238,7 +289,9 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
             onInput={handleInput}
             onChange={handleChange}
         >
-            {children}
+            <fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>
+                {children}
+            </fieldset>
         </Form>
     }
 
@@ -250,9 +303,11 @@ const FormyCoreInner = <State extends FormyActionState & StrictFormyState<State>
         onInput={handleInput}
         onChange={handleChange}
     >
-        {children}
+        <fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>
+            {children}
+        </fieldset>
     </form>
 }
 
-export const FormyCore = memo<typeof FormyCoreInner>(FormyCoreInner);
+export const FormyCore = memo(FormyCoreInner);
 

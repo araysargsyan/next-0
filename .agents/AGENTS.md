@@ -61,4 +61,5 @@ Tailor the detail and length of commit messages based on the scope of changes:
 * **React 19 Event Typing**:
   * For `onSubmit` event handlers, use `SubmitEvent<HTMLFormElement>` (imported from `"react"`) instead of `FormEvent`.
   * For `onInput` event handlers, use `InputEvent<HTMLFormElement>` (imported from `"react"`) instead of `FormEvent`. Using `FormEvent` for `onInput` will cause compilation errors in React 19 due to native `InputEventHandler` requirements.
+* **No `MutableRefObject`**: Never use `MutableRefObject` from `"react"`. In React 19, `RefObject` is mutable by default (its `.current` property is mutable). Always use `RefObject` for all refs.
 

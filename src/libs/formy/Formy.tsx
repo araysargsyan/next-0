@@ -5,7 +5,7 @@ import type {SubmitEvent} from "react";
 import {useRouter} from "next/navigation";
 import Form from "next/form";
 import dynamic from "next/dynamic";
-import type {FormyActionState, StrictFormyState, FormyProps} from "./types";
+import type {FormyActionState, StrictFormyState, FormyProps, OnActionChangeFn} from "./types";
 import {FormyContext} from "./contexts/FormyContext";
 import {FormyPersistContext} from "./contexts/FormyPersistContext";
 import {useFormyActionState} from "./hooks/useFormyActionState";
@@ -17,8 +17,8 @@ import until from "@/libs/utils/until";
 
 const log = createLogger("Formy", "magenta");
 
-const FormyCoreDynamic = dynamic(() => 
-    until(5000).then(() => import("./FormyCore").then(m => ({ default: m.FormyCore })))
+const FormyCoreDynamic = dynamic(() =>
+    until(1000).then(() => import("./FormyCore").then(m => ({ default: m.FormyCore })))
 );
 
 export default function Formy<State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
@@ -35,15 +35,8 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
         log(`[${props.id ?? "anonymous"}] 🔄 Formy render`);
     });
 
-    const fieldsetRef = useRef<HTMLFieldSetElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
-
-    const handleCoreLoad = () => {
-        log(`[${props.id ?? "anonymous"}] FormyCore loaded, enabling fieldset`);
-        if (fieldsetRef.current) {
-            fieldsetRef.current.disabled = false;
-        }
-    };
+    const onActionChangeRef = useRef<OnActionChangeFn | null>(null);
 
     const router = useRouter();
     const [state, formAction, isPending] = useFormyActionState<State>(action, initialState);
@@ -82,6 +75,11 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
             onStateChange(state, router);
         }
     }, [state, onStateChange, router]);
+
+    // Delegate action state changes to FormyCore's registered handler
+    useEffect(() => {
+        onActionChangeRef.current?.(formyContextValue.state, formyContextValue.isPending, clearOnSuccess);
+    }, [formyContextValue.state, formyContextValue.isPending, clearOnSuccess]);
 
     const handleLightSubmit = (e: SubmitEvent<HTMLFormElement>) => {
         if (formRef.current) {
@@ -139,16 +137,10 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                     validatorsRef={validatorsRef}
                     setValue={persist.setValue}
                     persist={persist}
-                    state={formyContextValue.state}
-                    isPending={formyContextValue.isPending}
-                    clearOnSuccess={clearOnSuccess}
-                    id={props.id}
-                    onLoad={handleCoreLoad}
+                    onActionChangeRef={onActionChangeRef}
                     {...props}
                 >
-                    <fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>
-                        {children}
-                    </fieldset>
+                    {children}
                 </FormyCoreDynamic>
             )}
         </FormyContext.Provider>

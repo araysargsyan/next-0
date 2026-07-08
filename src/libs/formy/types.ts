@@ -33,8 +33,14 @@ export interface FormyPersistAdapter {
 
 export type GetStateFn<Store extends FormyStoreSlice = FormyStoreSlice> = () => Store;
 
-export interface FormyCoreProps<State extends FormyActionState & StrictFormyState<State>> extends Omit<
-    FormyProps<State>,
+export type OnActionChangeFn = (
+    state: FormyActionState | null,
+    isPending: boolean,
+    clearOnSuccess: boolean
+) => void;
+
+export interface FormyCoreProps extends Omit<
+    FormyProps,
     'children' | 'action' | 'initialState' | 'onStateChange' | 'clearOnSuccess' | 'onLoad'
 > {
     children: ReactNode;
@@ -47,10 +53,5 @@ export interface FormyCoreProps<State extends FormyActionState & StrictFormyStat
     }>>;
     formRef: RefObject<HTMLFormElement | null>;
     persist: FormyPersistAdapter;
-    state: State | null;
-    isPending: boolean;
-    clearOnSuccess: boolean;
-    onLoad?: () => void;
+    onActionChangeRef: RefObject<OnActionChangeFn | null>;
 }
-
-
