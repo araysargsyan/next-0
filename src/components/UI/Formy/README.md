@@ -9,7 +9,7 @@
 
 React 19 introduced a painful behavior for Server Action forms: **`form.reset()` is called automatically after every action completes** — including on validation errors.
 
-This means if a user submits a login form and the server returns `{ success: false, error: "Wrong password" }`, React 19 treats the action as *successfully completed* and **wipes all input values**. The user loses their typed email and has to start over.
+This means if a user submits a login form and the server returns `{ error: "Wrong password" }`, React 19 treats the action as *successfully completed* and **wipes all input values**. The user loses their typed email and has to start over.
 
 The community workarounds are unsatisfying:
 
@@ -53,19 +53,21 @@ This means:
 // app/sign-in/actions.ts
 'use server'
 
+import type { FormyActionState } from '@/components/UI/Formy';
+
 export async function signInAction(
-    _state: { success: boolean; error?: string | Record<string, string> } | null,
+    _state: FormyActionState | null,
     formData: FormData
-) {
+): Promise<FormyActionState> {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
     const user = await db.user.findByEmail(email);
     if (!user || !verifyPassword(password, user.passwordHash)) {
-        return { success: false, error: 'Invalid email or password.' };
+        return { error: 'Invalid email or password.' };
     }
 
-    return { success: true };
+    return { data: null };
 }
 ```
 
@@ -73,9 +75,10 @@ export async function signInAction(
 
 ```tsx
 // app/layout.tsx
+import { ReactNode } from 'react';
 import FormStoreProvider from '@/components/Providers/FormStoreProvider';
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
     return (
         <html>
             <body>
@@ -141,7 +144,7 @@ export const handleStateChange = (
     state: FormyActionState | null,
     router: ReturnType<typeof useRouter>
 ) => {
-    if (state?.success) {
+    if (state && 'data' in state) {
         localStorage.setItem('was_logged_in', 'true');
         router.push('/dashboard');
     }
@@ -168,7 +171,7 @@ Pass a function as `children` to access action `state` and `isPending` directly 
         <>
             <input name="username" type="text" required />
             {isPending && <p>Submitting...</p>}
-            {state?.success && <p>Done!</p>}
+            {state && 'data' in state && <p>Done!</p>}
             <FormySubmit>Submit</FormySubmit>
         </>
     )}
@@ -183,11 +186,10 @@ Your Server Action can return either a single string error or a field-keyed obje
 
 ```tsx
 // Global error — displayed by <FormyError /> (no `field` prop)
-return { success: false, error: 'Something went wrong.' };
+return { error: 'Something went wrong.' };
 
 // Field-specific errors — each displayed by matching <FormyError field="..." />
 return {
-    success: false,
     error: {
         email: 'This email is not registered.',
         password: 'Password must be at least 8 characters.',
@@ -257,21 +259,21 @@ Checkboxes and radios are fully supported. Formy restores their checked state af
 import type { FormyActionState, StrictFormyState } from '@/components/UI/Formy';
 
 type MyState = FormyActionState & {
-    data?: { userId: string };
+    data?: { userId: string } | null;
 };
 
 async function myAction(
     _state: MyState | null,
     formData: FormData
 ): Promise<MyState> {
-    return { success: true, data: { userId: '123' } };
+    return { data: { userId: '123' } };
 }
 
 <Formy<MyState> action={myAction}>
     {(state) => (
         <>
             <input name="username" />
-            {state?.data?.userId && <p>Welcome, user {state.data.userId}!</p>}
+            {state && 'data' in state && state.data?.userId && <p>Welcome, user {state.data.userId}!</p>}
             <FormySubmit>Submit</FormySubmit>
         </>
     )}
@@ -313,8 +315,6 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 | `children` | `ReactNode \| ((state, isPending) => ReactNode)` | — | Form content. Accepts JSX or a render-prop function. Render-prop receives the raw `Awaited<State> \| null`. |
 | `onStateChange` | `(state, router) => void` | `undefined` | Client callback fired on every new Server Action state. Receives the Next.js `router` for navigation. |
 | `clearOnSuccess` | `boolean` | `true` | When `true`, clears the store and resets the form on success. When `false`, preserves values. |
-| `submitLabel` | `string` | `undefined` | Enables a built-in default submit button with this label. |
-| `loadingLabel` | `string` | `"Loading..."` | Label for the built-in submit button while pending. |
 | `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
 
 ---
@@ -325,7 +325,7 @@ Renders field-specific or global error messages. Merges server errors and client
 
 | Prop | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `field` | `string` | `undefined` | Target input name. Omit for the global (string) error. |
+| `field` | `string` | `undefined` | Target input name. Omit for the global error. |
 | `validate` | `(value: string) => string \| null` | `undefined` | Client-side validator. Must be defined in a `'use client'` module. |
 | `below` | `boolean` | `false` | Positions the error below the input. Default is above. |
 | `absolute` | `boolean` | `true` | Absolute positioning to prevent layout shifts. Set `false` for in-flow rendering. |
@@ -347,7 +347,7 @@ Extends all standard `<button>` props. Automatically disables and shows loading 
 
 ### `<FormySuccess>` Props
 
-Renders children only when `state.success === true`.
+Renders children only when `state` contains the `data` discriminant.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
@@ -363,21 +363,21 @@ Wraps React 19's `useActionState`. Safely handles both Server Action functions a
 
 ---
 
-### `usePersistedForm<Store>(useStoreHook, formId)`
+### `usePersistedForm<Store>(getState, formId)`
 
 Hook that reads and writes a single form's persisted values from any store conforming to `FormyStoreSlice`.
 
-**Returns:** `FormyPersistAdapter` — `{ values, setValue, clear }`
+**Returns:** `FormyPersistAdapter` — `{ getValues, setValue, clear }`
 
 > Intended to be used via `createPersistBridge` — you rarely need to call this directly.
 
 ---
 
-### `createPersistBridge<Store>(useStoreHook)`
+### `createPersistBridge<Store>(useGetState)`
 
 Factory that connects any store conforming to `FormyStoreSlice` to `FormyPersistContext`. Returns a `<FormyPersistBridge>` Provider component.
 
-Internally uses `usePersistedForm.bind(null, useStoreHook)` to pass a store-bound hook as the context value without an extra wrapper.
+Internally uses `usePersistedForm.bind(null, getState)` to pass a store-bound hook as the context value without an extra wrapper.
 
 **`FormyStoreSlice` contract:**
 ```tsx
@@ -396,8 +396,8 @@ The base constraint for all Formy action return types.
 
 ```tsx
 type FormyActionState =
-    | { success: boolean; error?: string | Record<string, string> | null }
-    | { success: boolean; data?: unknown };
+    | { error: string | Record<string, string> | null }
+    | { data: unknown };
 ```
 
 ---

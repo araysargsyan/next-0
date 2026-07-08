@@ -7,7 +7,7 @@ export const handleStateChange = (
     state: FormyActionState | null,
     router: ReturnType<typeof useRouter>
 ) => {
-    if (state?.success) {
+    if (state && "data" in state) {
         localStorage.setItem("was_logged_in", "true");
         router.push("/");
     }

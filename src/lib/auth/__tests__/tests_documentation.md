@@ -24,7 +24,7 @@ We mock all Next.js server-side modules at the module level using `jest.mock()`.
 2.  **`next/navigation`**:
     We mock `redirect` to record the target URL in a `mockRedirect` spy and throw a specific `REDIRECT_THROWN` error to simulate Next.js's native redirect behavior (which throws an error to halt execution).
 3.  **`next/server`**:
-    We mock `NextRequest` and `NextResponse` inside the `jest.mock('next/server')` factory to avoid hoisting ReferenceErrors. They act as lightweight, pure-JS representations of Next.js Edge request and response objects.
+    We mock `NextRequest` and `NextResponse` inside the `jest.mock('next/server')` factory to avoid hoisting ReferenceErrors. They act as lightweight, pure-JS representations of Next.js request and response objects.
 
 ---
 
@@ -65,8 +65,8 @@ Tests backend request generation and responses for token rotation.
 *   **2.3 Rejection Error**: Asserts that if backend returns 401/500, it returns `success: false`.
 *   **2.4 Timeout/Abort Safety**: Asserts that if the backend fetch hangs or triggers a timeout, it catches the exception and fails gracefully.
 
-### 3. Middleware Gateway
-Tests pre-emptive session recovery inside the API Proxy / Middleware.
+### 3. Proxy Gateway
+Tests pre-emptive session recovery inside the network boundary (`src/proxy.ts`).
 
 *   **3.1 Access Token Present**: Asserts that if the access token is valid, request flows through unmodified.
 *   **3.2 No Tokens Present**: Asserts that if both tokens are missing, it flows through unmodified (allowing public route configurations to handle redirection).
@@ -75,7 +75,7 @@ Tests pre-emptive session recovery inside the API Proxy / Middleware.
     - **Request cookies** are updated (so Server Components see them on current render).
     - **Response headers** are appended (so the browser saves them).
     - Returns `isRefreshed: true`.
-*   **3.4 Double Sync Refresh Failure**: Asserts that if refresh fails in middleware, it redirects immediately to the sign-out route.
+*   **3.4 Double Sync Refresh Failure**: Asserts that if refresh fails, it redirects immediately to the sign-out route.
 *   **3.5 x-url Header Injection**: Asserts that `getAuthorizedResponse` injects the `x-url` header containing the current requested URL into the request headers.
 
 ### 4. Smart HTTP Client / Silent Retry
@@ -101,13 +101,18 @@ Tests the GET handler `/api/auth/refresh-and-return` bouncing users back after a
 
 ## 🚀 Execution Instructions
 
-Run tests using the project's configured npm script:
+Run the full test suite:
 ```bash
 npm run test
 ```
 
-*Under the hood, this executes:*
+Run only unit tests (excludes E2E):
+```bash
+npm run test:unit
+```
+
+*Under the hood, `npm run test` executes:*
 ```bash
 jest
 ```
-*(Uses Jest to execute all `.test.ts` files in the project).*
+*(Uses Jest Projects to execute all `.test.ts` files matching `src/**/__tests__/**/*.test.ts`).*

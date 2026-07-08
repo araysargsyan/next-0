@@ -1,0 +1,252 @@
+# Formy v7: State Management & DOM Sync — Session Cheatsheet
+
+> **Date:** July 5, 2026
+> **Scope:** Formy component ecosystem — checkbox/radio support, persist bridge, client-side validation, TypeScript cleanup, ESLint compliance, lifecycle logging, folder restructure, stale error flash fix, validator re-registration fix, file input clearing fix
+> **Status:** Core implementation complete, pending items listed below
+
+---
+
+## 1. What is Formy?
+
+A zero-hydration Server Action form wrapper for Next.js 16 + React 19. Solves the React 19 problem where `form.reset()` fires automatically after every Server Action completion (even on validation errors), wiping user-typed values.
+
+---
+
+## 2. File Structure
+
+```
+src/components/UI/Formy/
+├── formy.tsx                        # Main component (client boundary)
+├── index.ts                         # Public API — all exports
+├── types.ts                         # FormyActionState, FormyProps, StrictFormyState,
+│                                    #   FormyStoreSlice, FormyPersistAdapter, UseStoreHook
+├── README.md
+├── components/
+│   ├── FormyError.tsx               # Field/global error display + client validation registration
+│   ├── FormySubmit.tsx              # Submit button (useFormStatus from react-dom)
+│   └── FormySuccess.tsx             # Conditional success content
+├── contexts/
+│   ├── FormyContext.ts              # state + isPending + registerValidator
+│   └── FormyPersistContext.tsx      # FormyPersistHook context (store-agnostic adapter)
+├── hooks/
+│   ├── useFormyActionState.ts       # Wraps useActionState; handles fn vs URL action
+│   └── usePersistedForm.ts          # Hook: reads/writes one form's values from any store
+└── utils/
+    ├── createPersistBridge.tsx      # Factory: binds usePersistedForm to a store, returns <Provider>
+    └── domHelpers.ts                # setNativeValue, setNativeChecked
+```
+
+**Related files:**
+- `src/lib/store/formStore.ts` — Vanilla Zustand store (`createStore`)
+- `src/components/Providers/FormStoreProvider.tsx` — SSR-safe Zustand provider + `createPersistBridge` wiring
+
+---
+
+## 3. Key Architectural Decisions
+
+1. **`setNativeValue` / `setNativeChecked` over direct property mutation** — React keeps Virtual DOM in sync.
+2. **Zustand vanilla store (`createStore`) over React hook store (`create`)** — SSR safety in Next.js App Router.
+3. **`useState` lazy init in `FormStoreProvider`** — React 19 concurrent rendering safety + lint compliance.
+4. **`useFormStatus` in `FormySubmit`** — Makes the submit button universally reusable outside `<Formy>`.
+5. **`isRestoring` guard + `didTransitionEnd` pattern** — Prevents infinite loops from `setNativeValue` dispatching `"input"` events that trigger Zustand updates.
+6. **`createPersistBridge` factory** — Formy is 100% store-agnostic. Can be wired to Redux, Jotai, MobX, or custom context.
+7. **`FormyActionState | null` for `resolvedState`** — Avoids unsafe `as Awaited<State>` casts by splitting concerns: context gets merged error state, `children` render-prop gets the original clean `state`.
+8. **Render-phase state adjustment for `clearOnSuccess`** — `setClientErrors({})` called during render (not in `useEffect`) per React docs best practice.
+9. **`instanceof` narrowing over `as` casts in event handlers** — Eliminates TypeScript unsafe casts while being semantically correct.
+10. **`usePersistedForm.bind(null, useStoreHook)` in `createPersistBridge`** — Eliminates wrapper hook, ESLint-compliant (`.bind()` is not a hook call), passes bound hook as context value.
+11. **Local validation state in `FormyError` (v8.0)** — `clientError` and `isEdited` states live inside each `FormyError` instance, not in the parent `Formy`. `registerValidator` accepts `setErrorFn` and `onEditFn` callbacks. Parent calls them directly via `validators.current` ref on input/submit — zero parent re-renders triggered by validation or field editing.
+12. **Discriminated union without success field for FormyActionState** (v9.0) — Eliminates dual-state boolean ambiguity by defining the action output as either having `error` or `data` property.
+
+---
+
+## 4. Problems Solved — History
+
+### 4.1. Native DOM Sync (`setNativeValue`)
+
+**Problem:** Direct `input.value = "..."` bypasses React's internal tracking.
+
+**Solution:** `setNativeValue()` reads the native browser setter via `Object.getOwnPropertyDescriptor(prototype, "value").set`, calls it and dispatches a bubbling `"input"` event. React intercepts this and keeps Virtual DOM in sync.
+
+### 4.2. Checkbox & Radio DOM Sync (`setNativeChecked`)
+
+**Problem:** `setNativeValue` has no effect on checkboxes and radios — they use `.checked` not `.value`.
+
+**Solution:** `setNativeChecked()` — same pattern as `setNativeValue` but via `Object.getOwnPropertyDescriptor(prototype, "checked").set` + dispatches a bubbling `"change"` event.
+
+### 4.3. Checkbox Support in `handleSubmit`
+
+**Problem:** `new FormData(form)` does NOT include unchecked checkboxes at all (HTML spec behavior). On error restore, we'd never know a checkbox existed and should be unchecked.
+
+**Solution:** After building `FormData`, query all `input[type="checkbox"]` and append `"false"` for any that are missing from `FormData`:
+```typescript
+formRef.current.querySelectorAll('input[type="checkbox"]').forEach((el) => {
+    const cb = el as HTMLInputElement;
+    if (cb.name && !formData.has(cb.name)) {
+        formData.append(cb.name, "false");
+    }
+});
+```
+
+### 4.4. Checkbox & Radio Persist Sync (`onChange` handler)
+
+**Problem:** `handleInput` (triggered by `"input"` event) doesn't fire for checkboxes/radios — they use `"change"`.
+
+**Solution:** Added `handleChange` handler on `<Form onChange={handleChange}>`:
+- Checkbox: reads `.checked`, stores `"true"` / `"false"` via `persist.setValue`
+- Radio: stores `.value` only when `.checked === true`
+- Select: reads `.value` (select also fires `"change"` not `"input"`)
+- File: snapshots `FileList` into `savedFiles` ref
+
+**Guard:** `handleInput` skips checkboxes and radios (`type !== "checkbox" && type !== "radio"`) to avoid double-processing.
+
+### 4.5. Persist Bridge Architecture
+
+**Problem:** Original implementation was tightly coupled to Zustand.
+
+**Solution:** Formy is now completely store-agnostic:
+1. `FormyPersistContext` holds a `FormyPersistHook = (formId: string) => FormyPersistAdapter`
+2. `hooks/usePersistedForm.ts` — standalone hook `(useStoreHook, formId) => FormyPersistAdapter`
+3. `utils/createPersistBridge.tsx` — factory that accepts any store hook and returns a `<FormyPersistBridge>` Provider. Uses `usePersistedForm.bind(null, useStoreHook)` to bind the store without a wrapper hook.
+4. `FormStoreProvider` wires Zustand + bridge together at the app level
+
+### 4.6. Client-side Validation
+
+**What:** Real-time field validation on input + final validation on submit.
+
+**Architecture:**
+- `FormyContext` now exposes `registerValidator` in addition to `state` and `isPending`
+- `FormyError` accepts a `validate` prop: `(value: string) => string | null`
+- On mount, `FormyError` calls `registerValidator(field, validate)` and returns cleanup
+- `runFieldValidation(name, value)` is called from `handleInput`, `handleChange`, and `handleSubmit`
+- On submit: if client errors exist → `e.preventDefault()` + `setClientErrors(errors)`, Server Action is NOT called
+- `clientErrors` are merged into `resolvedState` (displayed by `FormyError` alongside server errors)
+
+> **Important:** `validate` functions must be defined in a Client Component file (or a `'use client'` module). They **cannot** be passed as props from a Server Component.
+
+### 4.7. Global Zustand `FormStore`
+
+**Store shape:** `{ forms: Record<formId, Record<fieldName, fieldValue>> }`
+
+**Actions:** `setFormValue(formId, name, value)`, `clearForm(formId)`
+
+**SSR safety:** Uses `createStore` from `zustand/vanilla` (not `create` — avoids cross-request state leakage in App Router).
+
+### 4.8. Infinite Loop Fix
+
+**Two guards:**
+1. `isRestoring` ref: set `true` before DOM restoration, `false` after. Both `handleInput` and `handleChange` return early when `isRestoring.current === true`.
+2. `prevIsPending` ref + `didTransitionEnd`: error-restoration `useEffect` runs DOM restoration only when `isPending` transitions `true → false`.
+
+### 4.9. TypeScript Compliance Fixes (July 5)
+
+- `resolvedState`: removed `as Awaited<State>` cast. Now typed explicitly as `FormyActionState | null` via `useMemo`. Children receive original `state` (clean `Awaited<State> | null` type).
+- `handleInput` / `handleChange`: replaced `as HTMLInputElement` unsafe casts with `instanceof` narrowing guards.
+- `stateError`: extracted via `"error" in state` guard before accessing `.error` to satisfy TypeScript's union type checking.
+
+### 4.10. ESLint Compliance Fixes (July 5)
+
+- `registerValidator` and `runFieldValidation` `useCallback` deps: added `setClientErrors`.
+- `resolvedState` wrapped in `useMemo` to fix `react-hooks/exhaustive-deps`.
+- `setClientErrors({})` removed from `useEffect` — moved to render-phase state adjustment.
+- `isRestoring.current` removed from render-body `console.log` (cannot access refs during render).
+- `restoreFromValues` wrapped in `useCallback([props.id])` to satisfy `exhaustive-deps` for `useEffect`.
+- `createPersistBridge` — uses `.bind()` instead of inline arrow callback or wrapper hook to satisfy `rules-of-hooks`.
+
+### 4.11. Folder Restructure (July 5)
+
+Formy was refactored from a flat folder into a clean modular structure:
+
+| Before | After |
+|:---|:---|
+| `FormyContext.ts` (root) | `contexts/FormyContext.ts` |
+| `FormyPersistContext.tsx` (root) | `contexts/FormyPersistContext.tsx` |
+| `FormyError.tsx` (root) | `components/FormyError.tsx` |
+| `FormySubmit.tsx` (root) | `components/FormySubmit.tsx` |
+| `FormySuccess.tsx` (root) | `components/FormySuccess.tsx` |
+| `useFormyActionState.ts` (root) | `hooks/useFormyActionState.ts` |
+| `createPersistBridge.tsx` (root) | `utils/createPersistBridge.tsx` + `hooks/usePersistedForm.ts` |
+| `index.tsx` | deleted (superseded by `index.ts`) |
+
+All old root re-export stubs were deleted. `index.ts` exports directly from subfolders.
+
+### 4.12. Lifecycle Logging
+
+All key events now have color-coded `console.log` with `[Formy: <id>]` prefix:
+
+| Color | Event |
+|:---|:---|
+| 🔵 Cyan | Every render (state snapshot) |
+| 🟢 Green | Mount hydration, success clear/restore |
+| 🟠 Orange | Input, change, checkbox, radio, select, file events |
+| 🟣 Purple | Field validation result (PASSED/FAILED) |
+| 🔴 Hot pink | Form submit |
+| 🔴 Red | Client validation failed |
+| 🔵 Teal | `restoreFromValues` DOM restoration |
+
+> **Note:** In React Strict Mode (dev only), the render body runs twice per render cycle. Double render logs are a Strict Mode artifact, not a bug.
+
+### 4.13. FormyActionState Simplification & Prop Cleanup (July 8, 2026)
+
+**Problem:** The `success` boolean field was redundant and created ambiguity about action results. Additionally, unused props (`submitLabel` / `loadingLabel`) cluttered the `<Formy>` component API.
+
+**Solution:** Removed the `success` field from `FormyActionState` and migrated all success checking logic to `"data" in state` pattern. The unused `submitLabel` and `loadingLabel` props were fully removed from the `<Formy>` component props interface while keeping explicit `<FormySubmit>` support intact.
+
+---
+
+## 5. What FormyContext Is Still Needed For
+
+`FormyContext` **cannot be replaced** by `useFormStatus`. The native hook only provides `pending`, `data`, `method`, `action` — not the returned Server Action state.
+
+Components that depend on `FormyContext`:
+- `FormyError` — reads `state.error` + calls `registerValidator`
+- `FormySuccess` — reads `state.data`
+- Render-prop `children` — receives `state, isPending`
+
+---
+
+## 6. Pending Items (TODO)
+
+### 6.1. File Input Limitation (Known, not critical)
+Browsers block programmatic setting of `<input type="file">` values for security. File inputs always reset on validation error.
+- **Current mitigation:** `savedFiles` ref captures the `FileList` on change and attempts restore via `DataTransfer` API.
+- **Limitation:** `DataTransfer`-based restore is not supported in all environments.
+
+### 6.2. Custom UI Component Compatibility
+Third-party UI libraries (Radix, Shadcn) hide native inputs. `querySelectorAll("input")` + `setNativeValue` won't reach them.
+- **When:** When such components are introduced into forms.
+
+### 6.3. Live Validation UX Improvements
+Validation fires on every keystroke (real-time). No debounce is applied yet.
+- **When:** Gradual, as UX requirements grow.
+
+---
+
+## 7. Current Form IDs in Use
+
+| Form | `id` prop | File |
+|:---|:---|:---|
+| Login | `login-form` | `src/components/Forms/LoginForm/index.tsx` |
+| Image Upload | `image-upload-form` | `src/components/Forms/ImageUploadForm.tsx` |
+
+---
+
+*Last updated: July 8, 2026*
+
+## 6.4. Stale Error Flash on Sequential Submits (RESOLVED, July 5)
+
+**Symptom:**
+1. Submit #1 → Server Action returns a **global** error (e.g. `{ success: false, error: "Invalid credentials" }`).
+2. User edits a field, submits again → this time the error is **field-specific** (e.g. email error).
+3. On screen, for roughly a second, the **old global error re-appears**, then disappears, and only *after* that the **new field error** shows up on the email input.
+
+The same glitch happens in reverse — field error first, then a global error on the next submit — the stale one flashes before being replaced.
+
+**Suspected cause (per user):**
+In a previous update, a handler was added that clears the currently-displayed error once the user starts typing a new value into an input. The glitch is suspected to originate from this "clear error on input" handling.
+
+**Status:** Resolved. The reset of `editedFields` was moved from the start of the submission (when `resolvedIsPending` becomes `true`) to the end of the submission (when `resolvedIsPending` transitions from `true` to `false`). This ensures that the filtered stale errors remain hidden while the Server Action is running.
+
+### 6.5. Codebase Walkthrough & Hooks Discussion (IN PROGRESS)
+- **Symptom/Goal:** Detailed review of Formy's internal hook design to align on the lifecycle and state management.
+- **Status:** Points 1-3 (formRef, savedValues, savedFiles) agreed; Point 4 (isRestoring guard) analyzed and discussed.
+- **Next Step:** Resume discussion starting from Point 5 (prevIsPending) through Point 12.

@@ -1,4 +1,4 @@
-# Next.js 16 Auth SDK Engine (`@/lib`)
+# Next.js 16 Auth SDK Engine (`@/lib/auth`)
 
 This package is a self-contained, configuration-driven authentication SDK engineered specifically for **Next.js 16**, **Turbopack**, and **React 19**. It resolves the framework's "Cookie Write-Only" limitation in Server Components by providing a clean session management engine with proactive gateways, silent action retries, and SSR bounce recovery.
 
@@ -65,8 +65,8 @@ export const protFetch = AuthService.protFetch;
 
 ## 🏗️ The Three-Layer Session Protection Architecture
 
-Next.js divides its execution environment into contexts with different cookie mutation rights:
-1. **Proxy / Network Boundary (`src/proxy.ts`)**: Can inspect and modify incoming request headers and outgoing response headers.
+Next.js 16 divides its execution environment into contexts with different cookie mutation rights:
+1. **Network Boundary (`src/proxy.ts`)**: Can inspect and modify incoming request headers and outgoing response headers.
 2. **Server Actions & Route Handlers**: Full read and write access to the cookie store using `cookies().set()`.
 3. **Server Components (SSR Page Rendering)**: Strictly **Read-Only** context; attempting to call `cookies().set()` throws a runtime exception.
 
@@ -79,7 +79,7 @@ To handle these boundaries cleanly, the `AuthService` orchestrates a three-layer
                                      │
                                      ▼
                     ┌─────────────────────────────────┐
-                    │     Layer 1: Proactive Proxy    │
+                    │   Layer 1: Proactive Proxy      │
                     │   (Double Sync & Token Refresh) │
                     └────────────────┬────────────────┘
                                      │
@@ -96,11 +96,11 @@ To handle these boundaries cleanly, the `AuthService` orchestrates a three-layer
 
 ### Layer 1: Proactive Gateway (The Double Sync Pattern)
 
-Executed in `src/proxy.ts` (Middleware boundary). It rotates tokens before the page starts rendering if the access token has expired but a valid refresh token exists.
+Executed in `src/proxy.ts` (network boundary). It rotates tokens before the page starts rendering if the access token has expired but a valid refresh token exists.
 
-- **The Problem**: If a proxy rotates a token, only the outgoing response (`Set-Cookie`) gets updated. The current rendering thread (rendering the Server Components for the active request) would still read the expired/missing cookie from the original request, causing a `401 Unauthorized` during SSR.
+- **The Problem**: If the proxy rotates a token, only the outgoing response (`Set-Cookie`) gets updated. The current rendering thread (rendering the Server Components for the active request) would still read the expired/missing cookie from the original request, causing a `401 Unauthorized` during SSR.
 - **The Solution (Double Sync)**: When `AuthService.getAuthorizedResponse` completes a successful refresh, it syncs the new tokens in two places:
-  1. **Request Headers (`Cookie`)**: Injected directly so the current execution context (the Server Components) reads the fresh tokens immediately.
+  1. **Request Headers (`Cookie`)**: Injected directly so the current execution context (Server Components) reads the fresh tokens immediately.
   2. **Response Headers (`Set-Cookie`)**: Injected into the browser response so the client stores the new cookies for subsequent requests.
 
 #### Double Sync Flow:
@@ -108,7 +108,7 @@ Executed in `src/proxy.ts` (Middleware boundary). It rotates tokens before the p
 sequenceDiagram
     autonumber
     actor Browser
-    participant Proxy as src/proxy.ts (Middleware)
+    participant Proxy as src/proxy.ts (Network Boundary)
     participant ServerComp as Server Component
     participant Backend as Backend Auth API (/api/auth/refresh)
     
@@ -186,7 +186,7 @@ Acts as a fail-safe fallback during Server Component rendering (SSR) if an unaut
 sequenceDiagram
     autonumber
     actor Browser
-    participant Proxy as src/proxy.ts (Middleware)
+    participant Proxy as src/proxy.ts (Network Boundary)
     participant ServerComp as Server Component (protFetch)
     participant BackendAPI as Backend Resource API (/api/auth/me)
     participant Reanimator as Route Handler (/api/auth/refresh-and-return)
@@ -230,7 +230,7 @@ sequenceDiagram
 
 During development, we resolved four major pitfalls common to Next.js authentication architectures:
 
-1. **The "Half-Sync" Failure**: Triggering a refresh inside Middleware updates the browser (`Set-Cookie` in response), but fails to update the request headers. The immediately following React rendering cycle reads the expired cookies from the incoming request, triggering a 401 error. *Fixed in Layer 1 via Double Sync.*
+1. **The "Half-Sync" Failure**: Triggering a refresh inside the proxy updates the browser (`Set-Cookie` in response), but fails to update the request headers. The immediately following React rendering cycle reads the expired cookies from the incoming request, triggering a 401 error. *Fixed in Layer 1 via Double Sync.*
 2. **The Swallowed Redirect**: Surrounding Server Actions with blind `try/catch` blocks intercepts Next.js's internal routing signals. Since `redirect()` works by throwing a special `NEXT_REDIRECT` error, swallowing it prevents the router from navigating. *Fixed by checking `if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;` in catch blocks.*
 3. **The Refresh Storm**: Concurrent requests hitting an expired session at the same time can cause a race condition, where multiple calls attempt to rotate the same refresh token concurrently. The first rotation invalidates the old token, causing subsequent calls to fail. *Fixed by handling de-duplication on the backend side.*
 4. **The Action Interruption**: Triggering a standard browser redirect during a `POST` file upload interrupts the upload, causing loss of form state. *Fixed in Layer 2 by running an in-place fetch retry, bypassing redirects entirely.*
@@ -303,28 +303,28 @@ The SDK includes a color-coded logging system built with ANSI codes to simplify 
 
 | Prefix | Color | Context | Meaning |
 | :--- | :--- | :--- | :--- |
-| `[Proxy]` | **Yellow** | `src/proxy.ts` | Tracks entry, public/private route validation, and routing decisions. |
-| `[AUTH]` | **Green** | `AuthService` | Logged during Double Sync, cookie commits, and middleware validation. |
-| `[FETCH-START]` | **Default** | `AuthService.protFetch` | Logged when a resource request is initiated. Shows the request path and parameters. |
-| `[FETCH-AUTH]` | **Green** | `AuthService.protFetch` | Logged when an in-action token rotation succeeds and retries the call. |
-| `[FETCH-ERROR]` | **Red** | `AuthService.protFetch` | Logged when a request fails with 401 and begins a recovery attempt or redirect. |
-| `[FETCH-FINISH]` | **Default** | `AuthService.protFetch` | Logged upon successful completion of a fetch request, showing HTTP status. |
-| `[REFRESH-START]` | **Green** | `AuthService.refresh` | Logged when the low-level fetch request to the rotation backend begins. |
-| `[REFRESH-ERROR]` | **Red** | `AuthService.refresh` | Logged when the token rotation fails (e.g., timeout, abort, or 401 response). |
-| `[REFRESH-FINISH]` | **Green** | `AuthService.refresh` | Logged when token rotation succeeds, confirming receipt of raw cookies. |
-| `[REANIMATOR-START]` | **Default** | `AuthService.handleRefreshAndReturn` | Logged when the fallback redirect bounce endpoint is hit. |
-| `[REANIMATOR-FINISH]`| **Green** | `AuthService.handleRefreshAndReturn` | Logged when the fallback endpoint completes rotation and redirects back. |
-| `[REANIMATOR-ERROR]` | **Red** | `AuthService.handleRefreshAndReturn` | Logged when the fallback endpoint fails to rotate tokens and forces a logout. |
-| `[SignInAction]` | **Magenta** | `src/app/sign-in/actions.ts` | Tracks credentials validation and initial session commits. |
-| `[SignOut]` | **Red** | `src/app/api/auth/sign-out/route.ts` | Tracks session destruction and redirect to the sign-in page. |
+| `Proxy` | **Yellow** | `src/proxy.ts` | Tracks entry, public/private route validation, and routing decisions. |
+| `AuthService [AUTH]` | **Green** | `AuthService` | Logged during Double Sync, cookie commits, and proxy validation. |
+| `AuthService [FETCH-START]` | **Green** | `AuthService.protFetch` | Logged when a resource request is initiated. Shows the request path and parameters. |
+| `AuthService [FETCH-AUTH]` | **Green** | `AuthService.protFetch` | Logged when an in-action token rotation succeeds and retries the call. |
+| `AuthService [FETCH-ERROR]` | **Green** | `AuthService.protFetch` | Logged when a request fails with 401 and begins a recovery attempt or redirect. |
+| `AuthService [FETCH-FINISH]` | **Green** | `AuthService.protFetch` | Logged upon successful completion of a fetch request, showing HTTP status. |
+| `AuthService [REFRESH-START]` | **Green** | `AuthService.refresh` | Logged when the low-level fetch request to the rotation backend begins. |
+| `AuthService [REFRESH-ERROR]` | **Green** | `AuthService.refresh` | Logged when the token rotation fails (e.g., timeout, abort, or 401 response). |
+| `AuthService [REFRESH-FINISH]` | **Green** | `AuthService.refresh` | Logged when token rotation succeeds, confirming receipt of raw cookies. |
+| `AuthService [REANIMATOR-START]` | **Green** | `AuthService.handleRefreshAndReturn` | Logged when the fallback redirect bounce endpoint is hit. |
+| `AuthService [REANIMATOR-FINISH]` | **Green** | `AuthService.handleRefreshAndReturn` | Logged when the fallback endpoint completes rotation and redirects back. |
+| `AuthService [REANIMATOR-ERROR]` | **Green** | `AuthService.handleRefreshAndReturn` | Logged when the fallback endpoint fails to rotate tokens and forces a logout. |
+| `SignInAction` | **Magenta** | `src/app/sign-in/actions.ts` | Tracks credentials validation and initial session commits. |
+| `SignOut` | **Red** | `src/app/api/auth/sign-out/route.ts` | Tracks session destruction and redirect to the sign-in page. |
 
 ---
 
 ## ⚙️ Core Public API Methods
 
 ### `getAuthorizedResponse(req: NextRequest)`
-- **Execution Context**: Next.js Proxy boundary (`src/proxy.ts`).
-- **Purpose**: Checks the incoming request's tokens. If the access token is missing or expired, but the refresh token is present, it calls the backend refresh endpoint, updates request headers (Double Sync), and appends `Set-Cookie` headers to the response. It also injects the `x-url` header containing the requested URL to facilitate page restoration.
+- **Execution Context**: Network boundary (`src/proxy.ts`).
+- **Purpose**: Checks the incoming request's tokens. If the access token is missing or expired, but the refresh token is present, it calls the backend refresh endpoint, updates request headers (Double Sync), and appends `Set-Cookie` headers to the response. Also injects the `x-url` header containing the requested URL to facilitate page restoration.
 - **Signature**:
   ```typescript
   interface AuthService {
@@ -408,7 +408,7 @@ interface AuthService {
 
 ## 🧪 Unit Testing Strategy
 
-The SDK features a comprehensive unit test suite with **21 test cases** checking all core functions. 
+The SDK features a comprehensive unit test suite with **21 test cases** checking all core functions.
 
 The tests run on **Jest** and utilize Jest's module-level mocking capabilities to mock Next.js server-side modules (`next/headers`, `next/navigation`, `next/server`) in complete isolation.
 
@@ -440,7 +440,7 @@ flowchart TD
 ```
 
 ### Test Sections Summary
-The 21 unit tests are organized into 5 functional sections in [AuthService.test.ts](file:///C:/Users/arays/Documents/Projects/next-0/src/lib/auth/__tests__/AuthService.test.ts):
+The 21 unit tests are organized into 5 functional sections in [./__tests__/AuthService.test.ts](./__tests__/AuthService.test.ts):
 
 1. **1. Cookie Parser & Commit**
    - *1.1 Parse standard attributes*: Verifies extraction of standard fields (Domain, Secure, etc.).
@@ -454,12 +454,12 @@ The 21 unit tests are organized into 5 functional sections in [AuthService.test.
    - *2.3 Rejection (401/500)*: Asserts direct forwarding to the logout route.
    - *2.4 Timeout/Abort*: Verifies safe catch-and-fail behavior on connection aborts.
 
-3. **3. Middleware Gateway**
+3. **3. Proxy Gateway**
    - *3.1 Access Token Present*: Requests bypass with `NextResponse.next()`.
    - *3.2 Missing tokens*: Requests bypass (enabling app-level public route fallback).
    - *3.3 Double Sync success*: Validates cookie injections in both Request and Response.
    - *3.4 Refresh failure*: Confirms immediate redirection to logout.
-   - *3.5 x-url Header Injection*: Asserts that `getAuthorizedResponse` injects the `x-url` header containing the current requested URL.
+   - *3.5 x-url Header Injection*: Asserts that `getAuthorizedResponse` injects the `x-url` header.
 
 4. **4. Smart HTTP Client / Silent Retry**
    - *4.1 Normal 200 response*: Unmodified bypass.
@@ -473,7 +473,7 @@ The 21 unit tests are organized into 5 functional sections in [AuthService.test.
    - *5.2 Bounce failure*: Redirects to logout.
    - *5.3 Missing token bounce*: Immediately redirects to logout.
 
-For more details on the testing setup and logging formatting, refer to the [Testing Documentation](file:///C:/Users/arays/Documents/Projects/next-0/src/lib/auth/__tests__/tests_documentation.md).
+For more details on the testing setup and logging formatting, refer to the [Testing Documentation](./__tests__/tests_documentation.md).
 
 Run the test suite with:
 ```bash

@@ -31,7 +31,7 @@ export async function signInAction(_prevState: unknown, formData: FormData): Pro
                 // Ignore JSON parsing errors
             }
 
-            return { success: false, error: errorMessage };
+            return { error: errorMessage };
         }
 
         const headerCookies = res.headers.getSetCookie();
@@ -41,9 +41,9 @@ export async function signInAction(_prevState: unknown, formData: FormData): Pro
         }
 
         log(`[FINISH]: (${email}) ->`, "Success");
-        return { success: true };
+        return { data: null };
     } catch (e) {
         log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
-        return { success: false, error: "Something went wrong. Please try again later." };
+        return { error: "Something went wrong. Please try again later." };
     }
 }

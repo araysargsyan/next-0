@@ -18,7 +18,7 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
 
     if (!files || files.length === 0) {
         log(`[ERROR]: (${name || 'unknown'}) ->`, "No files selected");
-        return { success: false, error: "No files selected" };
+        return { error: "No files selected" };
     }
 
     // Build a new FormData object specifically for the backend upload
@@ -44,16 +44,16 @@ export async function uploadImagesAction(_prevState: unknown, formData: FormData
             log(`[ERROR]: (${name || 'unknown'}) ->`, "Upload failed", { status: res.status, errorData });
 
             const errorMessage = parseApiError(errorData);
-            return { success: false, error: errorMessage };
+            return { error: errorMessage };
         }
 
         const apiResponseData = await res.json();
         log(`[FINISH]: (${name || 'unknown'}) ->`, "Upload successful", { data: apiResponseData });
 
         revalidatePath("/"); // Revalidate the page to reflect the new upload
-        return { success: true, data: apiResponseData };
+        return { data: apiResponseData };
     } catch (e) {
         log(`[ERROR]: (${name || 'unknown'}) ->`, "Critical failure", String(e));
-        return { success: false, error: "Something went wrong. Please try again later." };
+        return { error: "Something went wrong. Please try again later." };
     }
 }

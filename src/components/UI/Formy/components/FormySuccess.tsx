@@ -9,7 +9,7 @@ const log = createLogger("FormySuccess", "green");
 
 export function FormySuccess({ children }: { children: ReactNode }) {
     const { state } = useContext(FormyContext);
-    const isSuccess = !!(state && "success" in state && state.success);
+    const isSuccess = !!(state && "data" in state);
 
     useIsomorphicLayoutEffect(() => {
         log(`🔄 render`, { isSuccess });

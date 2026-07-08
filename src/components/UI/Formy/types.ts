@@ -3,11 +3,11 @@ import { useRouter } from "next/navigation";
 import Form from "next/form";
 
 export type FormyActionState =
-    | { success: false; error?: string | Record<string, string> | null }
-    | { success: true; data?: unknown };
+    | { error: string | Record<string, string> | null }
+    | { data: unknown };
 
 export type StrictFormyState<T> = {
-    [K in keyof T]: K extends "error" | "success" | "data" ? T[K] : never
+    [K in keyof T]: K extends "error" | "data" ? T[K] : never
 };
 
 export interface FormyProps<State extends FormyActionState & StrictFormyState<State> = FormyActionState>
@@ -16,8 +16,6 @@ export interface FormyProps<State extends FormyActionState & StrictFormyState<St
     initialState?: Awaited<State> | null;
     children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
     onStateChange?: (state: State | null, router: ReturnType<typeof useRouter>) => void;
-    // submitLabel?: string;
-    // loadingLabel?: string;
     clearOnSuccess?: boolean;
 }
 
@@ -37,7 +35,7 @@ export type GetStateFn<Store extends FormyStoreSlice = FormyStoreSlice> = () => 
 
 export interface FormyCoreProps<State extends FormyActionState & StrictFormyState<State>> extends Omit<
     FormyProps<State>,
-    'children' | 'action' | 'initialState' | 'onStateChange' | 'submitLabel' | 'loadingLabel' | 'clearOnSuccess'
+    'children' | 'action' | 'initialState' | 'onStateChange' | 'clearOnSuccess'
 > {
     children: ReactNode;
     clearFieldError: (name: string) => void;

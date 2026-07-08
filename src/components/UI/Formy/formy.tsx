@@ -126,7 +126,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
 
     // Restore field values after the action completes (RSC / Server Action reset)
     useEffect(() => {
-        if (formyContextValue.state && "success" in formyContextValue.state && formyContextValue.state.success) {
+        if (formyContextValue.state && "data" in formyContextValue.state) {
             if (clearOnSuccess) {
                 log(`[${props.id ?? "anonymous"}] action succeeded, clearing state`);
                 persistRef.current.clear();
