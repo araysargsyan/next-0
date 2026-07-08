@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { AuthService } from "@/lib/auth";
+import { AuthService } from "@/libs/auth";
 
 /**
  * This route is the "reanimator" — it fully delegates its logic to AuthService.

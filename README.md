@@ -2,7 +2,7 @@
 
 This repository houses a state-of-the-art authentication and session restoration architecture designed specifically for **Next.js 16.2.9**, **React 19.2**, and **Turbopack**.
 
-At the center of this project is the **`AuthService` SDK**, a custom-built, dependency-free library located in `src/lib/auth`. The system solves Next.js's native "Cookie Write-Only" restriction inside Server Components, ensuring zero-flicker UI updates, silent session recovery, and resilient file/form actions with zero data loss.
+At the center of this project is the **`AuthService` SDK**, a custom-built, dependency-free library located in `src/libs/auth`. The system solves Next.js's native "Cookie Write-Only" restriction inside Server Components, ensuring zero-flicker UI updates, silent session recovery, and resilient file/form actions with zero data loss.
 
 ---
 
@@ -40,18 +40,18 @@ At the center of this project is the **`AuthService` SDK**, a custom-built, depe
 │   │   ├── Forms/                  # App-level form components (LoginForm, ImageUploadForm)
 │   │   ├── Providers/
 │   │   │   └── FormStoreProvider   # Zustand store + createPersistBridge wiring for Formy
-│   │   ├── UI/
-│   │   │   └── Formy/              # Generic type-safe form controller (see Formy README)
 │   │   └── SignOutLink.tsx         # Client component for triggering sign-out navigation
+│   ├── helpers/
+│   │   └── parseApiError.ts        # Normalizer for NestJS API error payloads
 │   ├── hooks/
 │   │   └── useIsomorphicLayoutEffect.ts  # SSR-safe useLayoutEffect (no-op on server)
-│   ├── lib/
+│   ├── libs/
 │   │   ├── auth/                   # AuthService SDK (see Auth README)
-│   │   ├── logger.ts               # ANSI color-coded console logger factory (createLogger)
-│   │   ├── store/
-│   │   │   └── formStore.ts        # Zustand vanilla store (FormState + FormActions)
+│   │   ├── formy/                  # Generic type-safe form controller (see Formy README)
 │   │   └── utils/
-│   │       └── error.ts            # parseApiError — NestJS error payload normalizer
+│   │       └── logger.ts           # ANSI color-coded console logger factory (createLogger)
+│   ├── store/
+│   │   └── formStore.ts            # Zustand vanilla store (FormState + FormActions)
 │   ├── config.ts                   # Global constants (API_URL, COOKIE_NAMES, AUTH_ROUTES, PUBLIC_ROUTES)
 │   └── proxy.ts                    # Network boundary — entry point for all non-static requests
 ├── jest.config.js                  # Unified Jest config (unit + e2e projects via Jest Projects)
@@ -66,7 +66,7 @@ At the center of this project is the **`AuthService` SDK**, a custom-built, depe
 All logic relating to authentication, proactive token rotation, double cookie synchronization (proxy and browser), and silent retries is encapsulated within the custom `AuthService` SDK.
 
 For details on the architecture (the 3-layer protection model), diagrams, pitfalls solved, Client Component integration via Server Actions, and logging prefixes, please refer to the dedicated SDK documentation:
-👉 **[AuthService SDK Documentation](./src/lib/auth/README.md)**
+👉 **[AuthService SDK Documentation](./src/libs/auth/README.md)**
 
 ---
 
@@ -81,7 +81,7 @@ Key capabilities:
 - **File input restoration** using `DataTransfer` after an action error.
 
 For details on configuration, patterns, and APIs, please refer to the dedicated Formy documentation:
-👉 **[Formy Component Documentation](./src/components/UI/Formy/README.md)**
+👉 **[Formy Component Documentation](./src/libs/formy/README.md)**
 
 ---
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import {createLogger} from "@/lib/logger";
+import {createLogger} from "@/libs/utils/logger";
 import {COOKIE_NAMES} from "@/config";
 
 const log = createLogger('SignOut', 'red');

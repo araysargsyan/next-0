@@ -1,10 +1,10 @@
 "use server";
 
-import { protFetch } from "@/lib/auth";
+import { protFetch } from "@/libs/auth";
 import { revalidatePath } from "next/cache";
-import { createLogger } from "@/lib/logger";
-import { parseApiError } from "@/lib/utils/error";
-import {FormyActionState} from "@/components/UI/Formy";
+import { createLogger } from "@/libs/utils/logger";
+import { parseApiError } from "@/helpers/parseApiError";
+import {FormyActionState} from "@/libs/formy";
 
 const log = createLogger('UploadAction', 'magenta');
 

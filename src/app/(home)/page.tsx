@@ -1,6 +1,6 @@
-import { protFetch } from "@/lib/auth";
+import { protFetch } from "@/libs/auth";
 import ImageUploadForm from "@/components/Forms/ImageUploadForm";
-import { createLogger } from "@/lib/logger";
+import { createLogger } from "@/libs/utils/logger";
 import Link from "next/link";
 import SignOutLink from "@/components/SignOutLink";
 

@@ -1,5 +1,5 @@
 import { createStore } from "zustand/vanilla";
-import {createLogger} from "@/lib/logger";
+import {createLogger} from "@/libs/utils/logger";
 
 export interface FormState {
     forms: Record<string, Record<string, string>>;

@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { createFormStore } from "@/lib/store/formStore";
-import { createPersistBridge } from "@/components/UI/Formy";
+import { createFormStore } from "@/store/formStore";
+import { createPersistBridge } from "@/libs/formy";
 
 const FormStoreContext = createContext<ReturnType<typeof createFormStore> | null>(null);
 

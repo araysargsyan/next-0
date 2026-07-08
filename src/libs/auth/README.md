@@ -1,4 +1,4 @@
-# Next.js 16 Auth SDK Engine (`@/lib/auth`)
+# Next.js 16 Auth SDK Engine (`@/libs/auth`)
 
 This package is a self-contained, configuration-driven authentication SDK engineered specifically for **Next.js 16**, **Turbopack**, and **React 19**. It resolves the framework's "Cookie Write-Only" limitation in Server Components by providing a clean session management engine with proactive gateways, silent action retries, and SSR bounce recovery.
 
@@ -7,7 +7,7 @@ This package is a self-contained, configuration-driven authentication SDK engine
 ## 📦 Directory Structure
 
 ```
-src/lib/auth/
+src/libs/auth/
 ├── index.ts                     # Barrel exporter (Public SDK API & Singleton setup)
 ├── AuthService.ts               # Core engine logic (Configurable class)
 ├── types.ts                     # Type definitions
@@ -44,7 +44,7 @@ export interface AuthSDKConfig {
 
 ### 2. Setting Up the Singleton Instance
 
-Create a unified entry point (typically `src/lib/auth/index.ts`) to configure and export the service. All configurations (like cookie names and routes) are imported from the global `@/config` file:
+Create a unified entry point (typically `src/libs/auth/index.ts`) to configure and export the service. All configurations (like cookie names and routes) are imported from the global `@/config` file:
 
 ```typescript
 import { AuthService as AuthServiceClass } from "./AuthService";
@@ -247,7 +247,7 @@ To execute data mutations or upload files from Client Components safely without 
 ```typescript
 "use server";
 
-import { protFetch } from "@/lib/auth";
+import { protFetch } from "@/libs/auth";
 
 export async function uploadImagesAction(_prevState: unknown, formData: FormData) {
     try {

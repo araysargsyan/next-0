@@ -31,7 +31,7 @@ We mock all Next.js server-side modules at the module level using `jest.mock()`.
 ## 📝 Logging Strategy (Clean Terminal Logs)
 
 To keep test output clean and easy to debug:
-- **No Stack Traces**: All `console.log` calls are intercepted via `jest.spyOn(console, 'log')` and redirected to `process.stdout.write`. This prevents Jest from appending annoying stack trace lines (e.g. `at log (src/lib/logger.ts...)`).
+- **No Stack Traces**: All `console.log` calls are intercepted via `jest.spyOn(console, 'log')` and redirected to `process.stdout.write`. This prevents Jest from appending annoying stack trace lines (e.g. `at log (src/libs/utils/logger.ts...)`).
 - **Indentation**: Logs printed during a test's execution are automatically indented by 4 spaces.
 - **Test Boundaries**: The `beforeEach` and `afterEach` hooks extract the current test number (e.g. `5.3`) using `expect.getState().currentTestName` and print clear start/end markers:
   ```text

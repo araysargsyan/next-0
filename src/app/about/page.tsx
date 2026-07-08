@@ -1,6 +1,6 @@
-import {protFetch} from "@/lib/auth";
+import {protFetch} from "@/libs/auth";
 import ImageUploadForm from "@/components/Forms/ImageUploadForm";
-import { createLogger } from "@/lib/logger";
+import { createLogger } from "@/libs/utils/logger";
 import SignOutLink from "@/components/SignOutLink";
 
 const log = createLogger('HomePage', 'green');

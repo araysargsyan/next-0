@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
-import { createLogger } from "@/lib/logger";
-import {useErrorsContext} from "@/components/UI/Formy/contexts/ErrorsContext";
+import { createLogger } from "@/libs/utils/logger";
+import {useErrorsContext} from "../contexts/ErrorsContext";
 
 const log = createLogger("FormyError", "red");
 

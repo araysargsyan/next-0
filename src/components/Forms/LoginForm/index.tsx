@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { signInAction } from "@/app/sign-in/actions";
-import Formy, { FormyError, FormySubmit } from "@/components/UI/Formy";
+import Formy, { FormyError, FormySubmit } from "@/libs/formy";
 import InfoMessage from "./InfoMessage";
 import { handleStateChange, parsePasswordMessage } from "./handlers";
 import {validateEmail, validatePassword} from "./validators";

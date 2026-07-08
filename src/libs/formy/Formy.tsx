@@ -9,8 +9,8 @@ import {useFormyActionState} from "./hooks/useFormyActionState";
 import {useFormyErrors} from "./hooks/useFormyErrors";
 import {setNativeValue, setNativeChecked} from "./utils/domHelpers";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
-import {createLogger} from "@/lib/logger";
-import {ErrosContext} from "@/components/UI/Formy/contexts/ErrorsContext";
+import {createLogger} from "@/libs/utils/logger";
+import {ErrosContext} from "./contexts/ErrorsContext";
 import {FormyCore} from "./FormyCore";
 
 const log = createLogger("Formy", "magenta");

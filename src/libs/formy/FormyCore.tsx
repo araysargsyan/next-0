@@ -2,7 +2,7 @@ import {memo} from "react";
 import type { SubmitEvent, InputEvent, ChangeEvent } from "react";
 import Form from "next/form";
 import type { FormyActionState, StrictFormyState, FormyCoreProps } from "./types";
-import { createLogger } from "@/lib/logger";
+import { createLogger } from "@/libs/utils/logger";
 
 
 const log = createLogger("FormyCore", "cyan");

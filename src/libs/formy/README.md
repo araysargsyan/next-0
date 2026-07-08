@@ -53,7 +53,7 @@ This means:
 // app/sign-in/actions.ts
 'use server'
 
-import type { FormyActionState } from '@/components/UI/Formy';
+import type { FormyActionState } from '@/libs/formy';
 
 export async function signInAction(
     _state: FormyActionState | null,
@@ -95,7 +95,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
 ```tsx
 // components/LoginForm.tsx
-import Formy, { FormyError, FormySubmit } from '@/components/UI/Formy';
+import Formy, { FormyError, FormySubmit } from '@/libs/formy';
 import { signInAction } from '@/app/sign-in/actions';
 
 export default function LoginForm() {
@@ -138,7 +138,7 @@ Use `onStateChange` to run client-side logic (redirect, `localStorage`, etc.) wh
 'use client'
 
 import { useRouter } from 'next/navigation';
-import type { FormyActionState } from '@/components/UI/Formy';
+import type { FormyActionState } from '@/libs/formy';
 
 export const handleStateChange = (
     state: FormyActionState | null,
@@ -256,7 +256,7 @@ Checkboxes and radios are fully supported. Formy restores their checked state af
 ### Pattern G: Custom Type-safe State
 
 ```tsx
-import type { FormyActionState, StrictFormyState } from '@/components/UI/Formy';
+import type { FormyActionState, StrictFormyState } from '@/libs/formy';
 
 type MyState = FormyActionState & {
     data?: { userId: string } | null;
@@ -285,7 +285,7 @@ async function myAction(
 Formy is not coupled to Zustand. You can connect any store that conforms to `FormyStoreSlice`:
 
 ```tsx
-import { createPersistBridge } from '@/components/UI/Formy';
+import { createPersistBridge } from '@/libs/formy';
 
 // Your store hook must expose: forms, setFormValue, clearForm
 const FormyReduxBridge = createPersistBridge(useReduxFormStore);

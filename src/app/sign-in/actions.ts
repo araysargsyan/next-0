@@ -1,10 +1,10 @@
 "use server";
 
 import { API_URL } from "@/config";
-import { AuthService } from "@/lib/auth";
-import { createLogger } from "@/lib/logger";
-import { parseApiError, ParsedApiError } from "@/lib/utils/error";
-import {FormyActionState} from "@/components/UI/Formy";
+import { AuthService } from "@/libs/auth";
+import { createLogger } from "@/libs/utils/logger";
+import { parseApiError, ParsedApiError } from "@/helpers/parseApiError";
+import {FormyActionState} from "@/libs/formy";
 
 const log = createLogger('SignInAction', 'magenta');
 

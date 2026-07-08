@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from "next/navigation";
-import { FormyActionState } from "@/components/UI/Formy";
+import { FormyActionState } from "@/libs/formy";
 
 export const handleStateChange = (
     state: FormyActionState | null,

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createLogger } from "../logger";
 import { AuthSDKConfig, ParsedCookie, RefreshResponse } from "./types";
+import {createLogger} from "@/libs/utils/logger";
 
 
 const log = createLogger('AuthService', 'green');

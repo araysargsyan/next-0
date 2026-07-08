@@ -3,7 +3,7 @@
 import { useContext, type ReactNode } from "react";
 import { FormyContext } from "../contexts/FormyContext";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
-import { createLogger } from "@/lib/logger";
+import { createLogger } from "@/libs/utils/logger";
 
 const log = createLogger("FormySuccess", "green");
 
