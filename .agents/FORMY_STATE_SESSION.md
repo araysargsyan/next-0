@@ -250,3 +250,67 @@ In a previous update, a handler was added that clears the currently-displayed er
 - **Symptom/Goal:** Detailed review of Formy's internal hook design to align on the lifecycle and state management.
 - **Status:** Points 1-3 (formRef, savedValues, savedFiles) agreed; Point 4 (isRestoring guard) analyzed and discussed.
 - **Next Step:** Resume discussion starting from Point 5 (prevIsPending) through Point 12.
+
+### 6.6. Architectural Scope Issue: FormyCore is RSC-Only by Design (July 8, 2026)
+
+**Discovery:** During session review, we identified that **the entire FormyCore DOM manipulation layer exists exclusively to serve the RSC/uncontrolled input scenario**. This is not a limitation — it is the fundamental architectural purpose of Formy. However, it raises an important scope concern.
+
+**The Core Insight:**
+
+Formy's main goal is to keep `<input>` elements as **React Server Components (RSC)** — zero JS hydration for field layouts. The `<Formy>` client boundary wraps the form, while children (inputs, labels, layout divs) remain server-rendered static HTML.
+
+Because RSC inputs are **uncontrolled** (no `useState`, no `onChange` from React), the only way to restore their values after React 19's automatic `form.reset()` + RSC refresh is **direct DOM manipulation**. This is why `FormyCore` exists with its full DOM machinery.
+
+**The Problem with Controlled Inputs:**
+
+If a consumer creates a `'use client'` form (e.g., `LoginForm` with `useState` for each input) and wraps it in `<Formy>`, the following FormyCore internals become **dead weight** — code that runs but serves no purpose:
+
+| FormyCore Internals | Purpose (RSC scenario) | Needed for `useState` inputs? |
+|:---|:---|:---|
+| `savedValuesRef` | Snapshot DOM values before reset | ❌ Values live in React state |
+| `formRef.querySelectorAll("input")` | Discover uncontrolled inputs in DOM | ❌ React already tracks them |
+| `setNativeValue` / `setNativeChecked` | Restore values via native DOM setters | ❌ `setValue(x)` triggers re-render |
+| `isRestoringRef` guard | Prevent infinite loops during DOM restoration | ❌ No DOM restoration occurs |
+| `handleInput` / `handleChange` interception | Capture input from uncontrolled elements | ❌ `onChange` already manages state |
+| `restoreFromValues` useEffect | DOM restoration on `isPending: true→false` | ❌ Just `setState(savedValue)` |
+| `prevIsPending` ref | Detect action completion transition | ❌ Not needed without DOM restoration |
+
+With controlled inputs, the entire restoration logic collapses to a single line: `setEmail(savedEmail)`.
+
+**Why alternatives to `setNativeValue` don't work for RSC inputs:**
+
+1. **`defaultValue` via server response** — `useActionState` is a client hook; RSC inputs cannot access it. And `children` is opaque `ReactNode` — the client `<Formy>` parent cannot inject props into RSC children.
+2. **`onSubmit` + `e.preventDefault()`** — Prevents `form.reset()` but not the RSC refresh, which re-renders inputs with original `defaultValue`.
+3. **React Context** — RSC cannot consume context (`useContext` is client-only).
+4. **`useOptimistic` / render props** — Both require inputs to become client components, defeating the purpose.
+
+**Conclusion:** `setNativeValue` / `setNativeChecked` via native property descriptors is the **only viable best practice** for restoring uncontrolled RSC input values. All alternatives collapse into "make inputs client-side," which contradicts Formy's core architectural goal.
+
+**Resolution (July 8, 2026):** We implemented **Option 2 (Lightweight mode)** with dynamic importing:
+1. **Dynamic FormyCore Loading:** In `Formy.tsx`, we inspect the `children` type.
+   - If `children` is a function (controlled/render-prop mode) → we render a lightweight `<form>` or `<Form>` directly. The heavy DOM restoration logic and helpers are **not imported or loaded** at all.
+   - If `children` is a `ReactNode` (RSC/uncontrolled mode) → we dynamically import `FormyCore` (using `next/dynamic` with `ssr: true` default). All DOM-handling refs, hooks, and effects are encapsulated inside `FormyCore.tsx`.
+2. **Zero-Rerender Loading Barrier:** During the dynamic loading of `FormyCore`, descendants inside the form are wrapped in `<fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>`.
+   - On the server and initial client paint, the fieldset is natively `disabled`.
+   - When the `FormyCore` chunk finishes loading and mounts, it triggers `onLoad()`.
+   - The parent handles this by writing `fieldsetRef.current.disabled = false` directly to the DOM.
+   - This avoids any React state updates (`useState`) or parent component re-renders, adhering fully to the **Zero-Rerender** architecture of Formy.
+
+**Status:** Resolved. Full report: `./FORMY_DYNAMIC_LOADING_REPORT.md`
+
+### 6.7. Testing Dynamic Loading Changes (HIGH PRIORITY)
+
+Current dynamic loading implementation requires manual and automated verification before moving forward. See detailed checklist in `./FORMY_DYNAMIC_LOADING_REPORT.md` § 4.1.
+
+**Status:** Pending.
+
+### 6.8. Create `FormyInput` Component (NEXT FEATURE)
+
+A controlled-input wrapper component for the render-prop/controlled mode that integrates with Formy's error/validation system. Should handle:
+- Binding a controlled `<input>` to the validation registry (`registerValidator`)
+- Automatically clearing field errors on user input
+- Consistent error display styling
+- Proposed API and design decisions documented in `./FORMY_DYNAMIC_LOADING_REPORT.md` § 4.2.
+
+**Status:** Pending design discussion.
+

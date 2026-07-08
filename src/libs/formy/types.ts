@@ -35,7 +35,7 @@ export type GetStateFn<Store extends FormyStoreSlice = FormyStoreSlice> = () => 
 
 export interface FormyCoreProps<State extends FormyActionState & StrictFormyState<State>> extends Omit<
     FormyProps<State>,
-    'children' | 'action' | 'initialState' | 'onStateChange' | 'clearOnSuccess'
+    'children' | 'action' | 'initialState' | 'onStateChange' | 'clearOnSuccess' | 'onLoad'
 > {
     children: ReactNode;
     clearFieldError: (name: string) => void;
@@ -46,7 +46,11 @@ export interface FormyCoreProps<State extends FormyActionState & StrictFormyStat
         setError: (error: string | null) => void;
     }>>;
     formRef: RefObject<HTMLFormElement | null>;
-    savedFilesRef: RefObject<Record<string, File[]>>;
-    savedValuesRef: RefObject<Record<string, string>>;
-    isRestoringRef: RefObject<boolean>;
+    persist: FormyPersistAdapter;
+    state: State | null;
+    isPending: boolean;
+    clearOnSuccess: boolean;
+    onLoad?: () => void;
 }
+
+
