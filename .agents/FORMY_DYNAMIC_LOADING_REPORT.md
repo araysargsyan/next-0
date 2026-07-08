@@ -22,7 +22,7 @@ const FormyCoreDynamic = dynamic(() => import("./FormyCore").then(m => ({ defaul
 
 ### 1.2. Zero-Rerender Loading Barrier (fieldset pattern)
 
-During `FormyCore` dynamic loading, the form content is wrapped in a natively disabled fieldset:
+During `FormyCore` dynamic loading, the form content is wrapped in a natively disabled fieldset *inside* `FormyCore`:
 
 ```tsx
 <fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>
@@ -31,10 +31,10 @@ During `FormyCore` dynamic loading, the form content is wrapped in a natively di
 ```
 
 **Lifecycle:**
-1. Server render + initial client paint: fieldset is `disabled` → all inputs are non-interactive
-2. `FormyCore` chunk finishes loading and mounts → triggers `onLoad()` callback
-3. Parent writes `fieldsetRef.current.disabled = false` directly to the DOM
-4. No `useState` update, no parent re-render — pure DOM mutation
+1. Server render + initial client paint: fieldset is `disabled` → all inputs are non-interactive.
+2. `FormyCore` chunk finishes loading and mounts on the client → triggers a local `useEffect` mount callback.
+3. `FormyCore` writes `fieldsetRef.current.disabled = false` directly to the DOM.
+4. No `useState` update, no parent or child re-render — pure DOM mutation.
 
 **Why not `useState`:** A state update would trigger a full re-render of `<Formy>` and all its children. The fieldset approach keeps it at zero rerenders, consistent with Formy's architecture.
 
@@ -70,15 +70,15 @@ Client-side validation (`validatorsRef`) still works in lightweight mode via `ha
 
 | File | Change |
 |:---|:---|
-| `src/libs/formy/Formy.tsx` | Added `next/dynamic` import, `FormyCoreDynamic`, `fieldsetRef`, `handleCoreLoad`, render-prop branching |
-| `src/libs/formy/FormyCore.tsx` | Extracted as standalone component, accepts `onLoad` prop, calls it on mount |
-| `src/libs/formy/types.ts` | Added `onLoad?: () => void` to `FormyCoreProps` |
+| `src/libs/formy/Formy.tsx` | Added `next/dynamic` import, `FormyCoreDynamic`, `onActionChangeRef`, render-prop branching |
+| `src/libs/formy/FormyCore.tsx` | Extracted as standalone component, encapsulates `fieldsetRef` and disables/enables loading barrier internally, registers change handler |
+| `src/libs/formy/types.ts` | Added `onActionChangeRef` to `FormyCoreProps` |
 
 ---
 
 ## 3. Type-Check Status
 
-`tsc --noEmit` passes cleanly after fixing the `onLoad` handler type mismatch (`ReactEventHandler` vs `() => void`). The fix was to use `handleCoreLoad` (a plain `() => void` function) instead of a React event handler.
+`tsc --noEmit` passes cleanly. All props have been stabilized, preventing any unnecessary re-renders of `FormyCore` when parent state changes.
 
 ---
 

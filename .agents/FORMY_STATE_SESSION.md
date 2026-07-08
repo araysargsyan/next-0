@@ -134,8 +134,8 @@ formRef.current.querySelectorAll('input[type="checkbox"]').forEach((el) => {
 ### 4.8. Infinite Loop Fix
 
 **Two guards:**
-1. `isRestoring` ref: set `true` before DOM restoration, `false` after. Both `handleInput` and `handleChange` return early when `isRestoring.current === true`.
-2. `prevIsPending` ref + `didTransitionEnd`: error-restoration `useEffect` runs DOM restoration only when `isPending` transitions `true → false`.
+1. `isRestoring` ref: set `true` before DOM restoration, `false` after. Both `handleInput` and `handleChange` return early when `isRestoring` is `true`.
+2. `isActionEnded` flag in `localState` ref: armed when `isPending` becomes `true`, and consumed to trigger DOM restoration when `isPending` returns to `false`.
 
 ### 4.9. TypeScript Compliance Fixes (July 5)
 
@@ -246,10 +246,10 @@ In a previous update, a handler was added that clears the currently-displayed er
 
 **Status:** Resolved. The reset of `editedFields` was moved from the start of the submission (when `resolvedIsPending` becomes `true`) to the end of the submission (when `resolvedIsPending` transitions from `true` to `false`). This ensures that the filtered stale errors remain hidden while the Server Action is running.
 
-### 6.5. Codebase Walkthrough & Hooks Discussion (IN PROGRESS)
+### 6.5. Codebase Walkthrough & Hooks Discussion (RESOLVED, July 8, 2026)
 - **Symptom/Goal:** Detailed review of Formy's internal hook design to align on the lifecycle and state management.
-- **Status:** Points 1-3 (formRef, savedValues, savedFiles) agreed; Point 4 (isRestoring guard) analyzed and discussed.
-- **Next Step:** Resume discussion starting from Point 5 (prevIsPending) through Point 12.
+- **Status:** Resolved. All individual refs (`prevIsPending`, `savedValuesRef`, `savedFilesRef`, `isRestoringRef`, `hasHydrated`, `persistRef`) were consolidated into a single `localState` ref object with clear JSDoc explanations for each field.
+- **Action State Separation:** The transition tracking and DOM restoration effects were moved into `FormyCore`'s action state handler, registered into a parent-owned `onActionChangeRef` callback. This prevents `FormyCore` from re-rendering on parent `state` / `isPending` updates.
 
 ### 6.6. Architectural Scope Issue: FormyCore is RSC-Only by Design (July 8, 2026)
 
@@ -290,10 +290,9 @@ With controlled inputs, the entire restoration logic collapses to a single line:
 1. **Dynamic FormyCore Loading:** In `Formy.tsx`, we inspect the `children` type.
    - If `children` is a function (controlled/render-prop mode) → we render a lightweight `<form>` or `<Form>` directly. The heavy DOM restoration logic and helpers are **not imported or loaded** at all.
    - If `children` is a `ReactNode` (RSC/uncontrolled mode) → we dynamically import `FormyCore` (using `next/dynamic` with `ssr: true` default). All DOM-handling refs, hooks, and effects are encapsulated inside `FormyCore.tsx`.
-2. **Zero-Rerender Loading Barrier:** During the dynamic loading of `FormyCore`, descendants inside the form are wrapped in `<fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>`.
+2. **Zero-Rerender Loading Barrier:** During the dynamic loading of `FormyCore`, the form contents are wrapped in `<fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>` *inside* `FormyCore`.
    - On the server and initial client paint, the fieldset is natively `disabled`.
-   - When the `FormyCore` chunk finishes loading and mounts, it triggers `onLoad()`.
-   - The parent handles this by writing `fieldsetRef.current.disabled = false` directly to the DOM.
+   - When the `FormyCore` chunk finishes loading and mounts on the client, it directly sets `fieldsetRef.current.disabled = false` inside its mount effect.
    - This avoids any React state updates (`useState`) or parent component re-renders, adhering fully to the **Zero-Rerender** architecture of Formy.
 
 **Status:** Resolved. Full report: `./FORMY_DYNAMIC_LOADING_REPORT.md`

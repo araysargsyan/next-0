@@ -38,6 +38,12 @@ Formy guarantees absolute minimal rendering footprint via a decoupled architectu
 
 For cross-navigation persistence, Formy integrates with an optional global store (Zustand by default) via a **store-agnostic bridge** — so your store choice doesn't matter.
 
+### Dynamic Loading & Lightweight Mode
+Formy is optimized for both uncontrolled (RSC) and controlled (client-side) forms, dynamically tailoring its bundle footprint:
+- **Lightweight Mode (Controlled / Render-prop):** If you pass a function as `children`, Formy renders a lightweight `<form>` or `<Form>` directly. The heavy DOM restoration layer (`FormyCore`) is **never downloaded** by the browser.
+- **Dynamic Restoration Mode (Uncontrolled / RSC):** If you pass static `ReactNode` JSX as `children`, Formy dynamically imports `FormyCore` (via `next/dynamic` with SSR enabled).
+- **Zero-Rerender Loading Barrier:** During the dynamic chunk load, `FormyCore` renders a native `<fieldset disabled>` to prevent early user interaction. When the chunk hydrates on the client, it enables the fieldset directly in the DOM, avoiding any parent or child React re-renders.
+
 This means:
 - Your `<input>` fields can stay in a **Server Component** (pure static HTML, zero JS hydration weight).
 - On error, the user's typed values are preserved automatically.
