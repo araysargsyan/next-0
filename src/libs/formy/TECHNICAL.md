@@ -168,4 +168,16 @@ For Formy's uncontrolled mode, `ssr: true` is the only way to achieve seamless S
 
 ---
 
+## 8. Internal State & Lifecycle Flags (`localState` in `FormyCore`)
+
+To maintain its stateless parent behavior and avoid trigger-happy re-renders, `FormyCore` encapsulates mutable, non-rendering lifecycle flags and snapshots in a unified `localState` reference object:
+
+- **`savedValues`**: Snapshot of all form field values (name → value) captured at submit time in `handleSubmit`. Fallback source for DOM restoration when the persist store is not connected.
+- **`savedFiles`**: Snapshot of `File` objects per file-input name, captured in `handleChange`. Used to restore files via the `DataTransfer` API (as browser security policies block programmatic value assignment for file inputs).
+- **`isRestoring`**: Guard flag set to `true` during DOM restoration. Prevents infinite event loops from synthetic events dispatched by `setNativeValue` / `setNativeChecked`.
+- **`hasHydrated`**: Mount hydration flag. Prevents double-hydration side-effects under React 19's Strict Mode in development.
+- **`persist`**: Fresh reference to the `FormyPersistAdapter` prop, allowing callbacks and effects to read the latest store adapter without requiring it in dependency arrays.
+
+---
+
 *Last updated: July 10, 2026*

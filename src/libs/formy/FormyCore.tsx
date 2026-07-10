@@ -26,41 +26,19 @@ const FormyCoreInner = ({
     })
     const fieldsetRef = useRef<HTMLFieldSetElement>(null);
     const localState = useRef({
-        /**
-         * Snapshot of all form field values (name → value) captured
-         * at submit time in `handleSubmit`. Fallback source for DOM
-         * restoration when the persist store is not connected
-         * (i.e. `persist.getValues()` returns `undefined`).
-         */
+        /** Fallback value snapshot for DOM restoration when store is disconnected. */
         savedValues: {} as Record<string, string>,
 
-        /**
-         * Snapshot of File objects per file-input name, captured in
-         * `handleChange`. Browsers block programmatic `.value` setting
-         * on file inputs — we restore them via DataTransfer API.
-         */
+        /** File snapshots captured to restore via DataTransfer API. */
         savedFiles: {} as Record<string, File[]>,
 
-        /**
-         * Guard flag, `true` while `restoreFromValues` is running.
-         * Prevents infinite loop: `setNativeValue` dispatches synthetic
-         * events → `handleInput`/`handleChange` would re-save values
-         * being restored without this guard.
-         */
+        /** Guard to prevent event loop during DOM restoration. */
         isRestoring: false,
 
-        /**
-         * `true` after initial mount hydration from the persist store.
-         * Prevents double-hydration in React Strict Mode (dev),
-         * where mount effects fire twice.
-         */
+        /** Flag to prevent double-hydration in Strict Mode. */
         hasHydrated: false,
 
-        /**
-         * Always-fresh reference to the `persist` adapter prop.
-         * Stored here so callbacks/effects read the latest adapter
-         * without needing `persist` in dependency arrays.
-         */
+        /** Fresh reference to store persist adapter. */
         persist: persist,
     });
 
