@@ -17,6 +17,13 @@ export interface FormyProps<State extends FormyActionState & StrictFormyState<St
     children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
     onStateChange?: (state: State | null, router: ReturnType<typeof useRouter>) => void;
     clearOnSuccess?: boolean;
+    /**
+     * Bypasses the FormyCore DOM orchestration engine.
+     * Useful when rendering standard ReactNode children (uncontrolled inputs)
+     * without Server Actions (e.g., pure client-side forms), where low-level
+     * value restoration on error is not required, to avoid chunk loading overhead.
+     */
+    plainMode?: boolean;
 }
 
 export interface FormyStoreSlice {

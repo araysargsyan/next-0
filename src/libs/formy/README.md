@@ -26,28 +26,22 @@ The community workarounds are unsatisfying:
 
 ## How It Works
 
-Formy intercepts the form's `onSubmit` event to **snapshot all input values** before the Server Action fires. After the action completes on error, it **imperatively restores those values directly in the DOM** — bypassing React 19's automatic `form.reset()`.
+Formy's core architectural goal is to keep your `<input>` elements as **React Server Components (RSC)** — pure static HTML with zero JS hydration weight. The `<Formy>` orchestrator acts as the client boundary, while all children (inputs, labels, layout markup) remain server-rendered static HTML and are never compiled into the client-side JavaScript bundle.
 
-### The Zero-Rerender Architecture
-Formy guarantees absolute minimal rendering footprint via a decoupled architecture:
-1. **`Formy` (Orchestrator):** Manages `useActionState` and initializes lightweight external stores. It does *not* render the form DOM itself.
-2. **`FormyCore` (DOM Layer):** Handles the `<form>` events and DOM restoration.
-3. **`FormyError` (Local State):** Subscribes directly to an external `ErrorsStore` and handles real-time client validation locally.
+To achieve this, Formy intercepts the form's `onSubmit` event to **snapshot all input values** before the Server Action fires. After the action completes on error, it **imperatively restores those values directly in the DOM** — bypassing React 19's automatic `form.reset()`.
 
-**Result:** Typing in one input or receiving a server validation error *never* triggers a re-render of the parent `<Formy>` component or sibling inputs.
+Formy guarantees zero unnecessary re-renders — typing in one input or receiving a server validation error *never* triggers a re-render of the parent component or sibling inputs.
+
+Formy automatically optimizes its bundle footprint: controlled forms (render-prop `children`) load zero DOM restoration code, while uncontrolled RSC forms dynamically load only the necessary DOM layer. Use `plainMode` for forms that don't need Server Actions at all.
 
 For cross-navigation persistence, Formy integrates with an optional global store (Zustand by default) via a **store-agnostic bridge** — so your store choice doesn't matter.
-
-### Dynamic Loading & Lightweight Mode
-Formy is optimized for both uncontrolled (RSC) and controlled (client-side) forms, dynamically tailoring its bundle footprint:
-- **Lightweight Mode (Controlled / Render-prop):** If you pass a function as `children`, Formy renders a lightweight `<form>` or `<Form>` directly. The heavy DOM restoration layer (`FormyCore`) is **never downloaded** by the browser.
-- **Dynamic Restoration Mode (Uncontrolled / RSC):** If you pass static `ReactNode` JSX as `children`, Formy dynamically imports `FormyCore` (via `next/dynamic` with SSR enabled).
-- **Zero-Rerender Loading Barrier:** During the dynamic chunk load, `FormyCore` renders a native `<fieldset disabled>` to prevent early user interaction. When the chunk hydrates on the client, it enables the fieldset directly in the DOM, avoiding any parent or child React re-renders.
 
 This means:
 - Your `<input>` fields can stay in a **Server Component** (pure static HTML, zero JS hydration weight).
 - On error, the user's typed values are preserved automatically.
 - On success, the cache is cleared and the form resets cleanly.
+
+> For architecture details, implementation decisions, and SSR analysis, see [Technical Documentation](./TECHNICAL.md).
 
 ---
 
@@ -322,6 +316,7 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 | `onStateChange` | `(state, router) => void` | `undefined` | Client callback fired on every new Server Action state. Receives the Next.js `router` for navigation. |
 | `clearOnSuccess` | `boolean` | `true` | When `true`, clears the store and resets the form on success. When `false`, preserves values. |
 | `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
+| `plainMode` | `boolean` | `false` | When `true`, bypasses dynamic loading of `FormyCore` and renders a plain `<form>`/`<Form>`. Ideal for forms without Server Actions. |
 
 ---
 

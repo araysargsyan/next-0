@@ -15,13 +15,13 @@
     "analyze:webpack": "node -e \"process.env.ANALYZE='true'; require('child_process').execSync('next build --webpack', {stdio: 'inherit'})\""
   },
   "dependencies": {
-    "@next/bundle-analyzer": "^16.2.10",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.10",
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",

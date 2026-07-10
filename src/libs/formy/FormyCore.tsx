@@ -7,7 +7,7 @@ import { setNativeValue, setNativeChecked } from "./utils/domHelpers";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 
 const log = createLogger("FormyCore", "cyan");
-
+console.log("FormyCore=SERVER RENDERING")
 const FormyCoreInner = ({
     children,
     className = "flex flex-col gap-4 w-full max-w-sm",

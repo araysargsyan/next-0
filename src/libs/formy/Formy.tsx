@@ -16,9 +16,9 @@ import {ErrosContext} from "./contexts/ErrorsContext";
 import until from "@/libs/utils/until";
 
 const log = createLogger("Formy", "magenta");
-
+console.log("Formy=SERVER RENDERING")
 const FormyCoreDynamic = dynamic(() =>
-    until(1000).then(() => import("./FormyCore").then(m => ({ default: m.FormyCore })))
+    until(1000, ()=>console.log('start dynamic import')).then(() => import("./FormyCore").then(m => ({ default: m.FormyCore })))
 );
 
 export default function Formy<State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
@@ -28,6 +28,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     onStateChange,
     className = "flex flex-col gap-4 w-full max-w-sm",
     clearOnSuccess = true,
+    plainMode = false,
     onLoad: _onLoad,
     ...props
 }: FormyProps<State>) {
@@ -104,10 +105,11 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     };
 
     const isRenderProp = typeof children === "function";
+    const shouldBypassCore = isRenderProp || plainMode;
 
     return <ErrosContext.Provider value={errorsContextValue}>
         <FormyContext.Provider value={formyContextValue}>
-            {isRenderProp ? (
+            {shouldBypassCore ? (
                 formAction ? (
                     <Form
                         ref={formRef}
@@ -116,7 +118,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                         {...props}
                         onSubmit={handleLightSubmit}
                     >
-                        {children(state, formyContextValue.isPending)}
+                        {typeof children === "function" ? children(state, formyContextValue.isPending) : children}
                     </Form>
                 ) : (
                     <form
@@ -125,7 +127,7 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                         {...props}
                         onSubmit={handleLightSubmit}
                     >
-                        {children(state, formyContextValue.isPending)}
+                        {typeof children === "function" ? children(state, formyContextValue.isPending) : children}
                     </form>
                 )
             ) : (

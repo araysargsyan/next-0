@@ -295,11 +295,11 @@ With controlled inputs, the entire restoration logic collapses to a single line:
    - When the `FormyCore` chunk finishes loading and mounts on the client, it directly sets `fieldsetRef.current.disabled = false` inside its mount effect.
    - This avoids any React state updates (`useState`) or parent component re-renders, adhering fully to the **Zero-Rerender** architecture of Formy.
 
-**Status:** Resolved. Full report: `./FORMY_DYNAMIC_LOADING_REPORT.md`
+**Status:** Resolved. Full documentation: `../../src/libs/formy/TECHNICAL.md`
 
 ### 6.7. Testing Dynamic Loading Changes (HIGH PRIORITY)
 
-Current dynamic loading implementation requires manual and automated verification before moving forward. See detailed checklist in `./FORMY_DYNAMIC_LOADING_REPORT.md` § 4.1.
+Current dynamic loading implementation requires manual and automated verification before moving forward. See detailed checklist in `./FORMY_DYNAMIC_LOADING_REPORT.md` § 5.1.
 
 **Status:** Pending.
 
@@ -309,7 +309,82 @@ A controlled-input wrapper component for the render-prop/controlled mode that in
 - Binding a controlled `<input>` to the validation registry (`registerValidator`)
 - Automatically clearing field errors on user input
 - Consistent error display styling
-- Proposed API and design decisions documented in `./FORMY_DYNAMIC_LOADING_REPORT.md` § 4.2.
+
+**Proposed API:**
+
+```tsx
+<Formy action={loginAction}>
+    {(state, isPending) => (
+        <>
+            <FormyInput
+                name="email"
+                value={email}
+                onInput={setEmail}
+                validate={(v) => v.includes("@") ? null : "Invalid email"}
+            />
+            <FormyInput
+                name="password"
+                type="password"
+                value={password}
+                onInput={setPassword}
+                validate={(v) => v.length >= 8 ? null : "Min 8 characters"}
+            />
+            <FormySubmit>Sign In</FormySubmit>
+        </>
+    )}
+</Formy>
+```
+
+**Key design decisions to resolve:**
+- Should `FormyInput` render the error message itself, or delegate to a sibling `<FormyError>`?
+- Should it support uncontrolled mode too (just `name` + `validate`, no `value`/`onInput`)?
+- Integration with persist bridge in controlled mode
 
 **Status:** Pending design discussion.
 
+## 11. Architecture v10.0: `plainMode` Prop & SSR Decision Analysis (July 10, 2026)
+- **New Prop (`plainMode`):** Added `plainMode?: boolean` to `FormyProps`. When `true`, bypasses dynamic loading of `FormyCore` and renders a plain `<form>` / `<Form>` for ReactNode children directly. Ideal for forms without Server Actions (e.g. search forms, client-side fetch handlers).
+- **SSR Decision (`ssr: true` vs `ssr: false`):** Conducted a thorough analysis of `ssr: false` with a skeleton fallback rendering `children`. Concluded that `ssr: true` is the only architecturally sound approach for Formy's uncontrolled mode due to:
+  1. DOM Swap/Unmount overhead (React destroys and recreates input DOM nodes on chunk load).
+  2. No server CPU savings (children still rendered inside the skeleton fallback).
+  3. TTI delay due to missing `<link rel="preload">` for the chunk.
+  4. Browser autofill/password manager compatibility issues.
+- **Documentation:** Full analysis recorded in `../../src/libs/formy/TECHNICAL.md` § 7.
+- **Bundle Cleanup:** Moved `@next/bundle-analyzer` from `dependencies` to `devDependencies` in `package.json`.
+
+---
+
+## Current TODO List (as of July 10, 2026)
+
+### 🔴 High Priority
+
+- [ ] **6.9. Error clearing for controlled inputs in lightweight/plainMode:**
+  Add `onInput`/`onChange` handlers to the `shouldBypassCore` branch in `Formy.tsx` that call `clearFieldError(target.name)` when user starts typing. Without this, server-side errors remain visible in controlled mode even after the user edits the field.
+
+- [ ] **6.7. Testing dynamic loading (FormyCore):**
+  - RSC/uncontrolled mode: verify dynamic chunk load, fieldset enable, value restoration on error.
+  - Render-prop/controlled mode: verify `FormyCore` chunk is NOT downloaded (Network tab).
+  - `plainMode`: verify ReactNode children render without chunk loading.
+
+- [ ] **Remove `until(1000)` debug delay before production:**
+  The artificial delay in `Formy.tsx` dynamic import is strictly for development testing of the zero-rerender loading barrier.
+
+### 🟡 Medium Priority
+
+- [ ] **6.8. Create `FormyInput` component:**
+  A controlled-input wrapper for render-prop/controlled mode with automatic validation registry binding, error clearing on input, and consistent error display styling. Proposed API documented in session § 6.8 above.
+
+- [ ] **File input restoration limitations:**
+  `DataTransfer`-based restore for `<input type="file">` is not supported in all environments. Needs testing and documentation of edge cases.
+
+### 🟢 Low Priority / Future
+
+- [ ] **Third-party UI library compatibility (Shadcn / Radix):**
+  Components with hidden native inputs (custom Select, Checkbox) may not be intercepted by `querySelectorAll("input")`. Needs investigation when such components are introduced.
+
+- [ ] **Client-side validation debounce:**
+  Currently validation fires on every keystroke. For async checks (e.g. email uniqueness) a debounce mechanism is needed.
+
+---
+
+*Last updated: July 10, 2026*
