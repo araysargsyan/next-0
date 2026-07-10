@@ -1,27 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/libs/utils/logger";
 import {useErrorsContext} from "../contexts/ErrorsContext";
 
 const log = createLogger("FormyError", "red");
 
-interface FormyErrorProps {
+type FormyErrorBaseProps = {
     field?: string;
     below?: boolean;
-    hasHelp?: boolean;
-    helpText?: string;
-    parseMessage?: (message: string) => { title: string; info: string };
     absolute?: boolean;
     validate?: (value: string) => string | null;
-}
+};
 
-export function FormyError({
+type FormyErrorProps = FormyErrorBaseProps & (
+    | { helpText: string; parseMessage?: never }
+    | { helpText?: never, parseMessage: (message: string) => { title: string; info?: string } }
+    | { helpText?: never; parseMessage?: never }
+);
+
+export const FormyError = memo(function FormyError({
     field = '__global__',
     below = false,
-    hasHelp = false,
-    helpText = "",
+    helpText,
     parseMessage,
     absolute = true,
     validate
@@ -50,19 +52,19 @@ export function FormyError({
 
     const error = clientError ? clientError : stateError;
     let titleText = "";
-    let infoText = helpText;
+    let infoText = helpText ?? "";
 
     if (error) {
         if (parseMessage) {
             const parsed = parseMessage(error);
             titleText = parsed.title;
-            infoText = parsed.info || infoText;
+            infoText = parsed.info ?? infoText;
         } else {
             titleText = error;
         }
     }
 
-    const helpIcon = hasHelp && infoText && (
+    const helpIcon = infoText && (
         <span className="relative group cursor-pointer inline-flex items-center">
             <svg
                 className="w-3.5 h-3.5 text-rose-500 hover:text-rose-700 transition-colors"
@@ -134,4 +136,4 @@ export function FormyError({
             {helpIcon}
         </div>
     );
-}
+});

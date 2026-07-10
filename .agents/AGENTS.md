@@ -19,6 +19,7 @@ To maintain a zero-warning IDE status and ensure clean Markdown parsing:
 * **No Auto-Committing**: Automatically staging or committing changes is strictly prohibited. Execute Git operations (`git add`, `git commit`) *only* upon direct user request (e.g., *"commit"* or *"lets commit"*).
 * **Codebase Language Integrity**: Keep the codebase 100% in English. No Russian words (Cyrillic or transliterated Latin-Russian) are permitted in code, comments, log messages, documentation, or configuration files.
 * **Exhaustive Directory Analysis**: Whenever instructed to study, analyze, or check the `.agents` directory, the agent must read *every* file present in that directory (e.g. `AUTH_SDK_SESSION_LOG.md`, `FORMY_STATE_SESSION.md`, `NEXT_16_RESOURCES.md`), not just `AGENTS.md`, to ensure full contextual alignment.
+* **Current Scope Exclusions**: Our active focus is on Formy and the AuthSDK session. Everything related to these components does not need to be analyzed.
 
 ---
 

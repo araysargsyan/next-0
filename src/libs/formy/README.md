@@ -161,15 +161,23 @@ import { handleStateChange } from './handlers';
 </Formy>
 ```
 
-### Pattern B: Render-prop Children
+### Pattern B: Render-prop Children (Controlled Mode)
 
-Pass a function as `children` to access action `state` and `isPending` directly in JSX:
+Pass a function as `children` to access action `state` and `isPending` directly. For controlled mode, use `<FormyInput>` to get automatic error clearing and client-side validation support:
 
 ```tsx
+import Formy, { FormyInput, FormySubmit } from '@/libs/formy';
+
 <Formy action={submitAction}>
     {(state, isPending) => (
         <>
-            <input name="username" type="text" required />
+            <FormyInput
+                name="username"
+                type="text"
+                value={username}
+                onInput={(e) => setUsername(e.currentTarget.value)}
+                validate={(val) => val ? null : "Username is required"}
+            />
             {isPending && <p>Submitting...</p>}
             {state && 'data' in state && <p>Done!</p>}
             <FormySubmit>Submit</FormySubmit>
@@ -178,7 +186,7 @@ Pass a function as `children` to access action `state` and `isPending` directly 
 </Formy>
 ```
 
-> **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`), not merged with client errors. Use `<FormyError>` for displaying validation errors.
+> **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`), not merged with client errors. `<FormyInput>` handles client error display internally.
 
 ### Pattern C: Field-specific vs. Global Errors
 
@@ -299,6 +307,61 @@ export default function AppProviders({ children }) {
 }
 ```
 
+### Pattern I: Third-party UI Components (Shadcn / Radix)
+
+Shadcn and Radix UI components (e.g. `Select`, `Checkbox`, `Switch`) are always Client Components — they require JavaScript for interactivity and accessibility (keyboard navigation, ARIA). They cannot be used as static RSC children.
+
+Use `useErrorsContext` to connect any custom component to Formy's error system. It gives you the current field error and `clearFieldError` — without duplicating event logic at the form level.
+
+```tsx
+// components/CountrySelect.tsx
+'use client'
+
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { useErrorsContext } from "@/libs/formy";
+import { FormyError } from "@/libs/formy";
+
+interface CountrySelectProps {
+    name: string;
+    defaultValue?: string;
+}
+
+export function CountrySelect({ name, defaultValue }: CountrySelectProps) {
+    const { clearFieldError } = useErrorsContext(name);
+
+    return (
+        <div className="relative">
+            <Select
+                name={name}
+                defaultValue={defaultValue}
+                onValueChange={() => clearFieldError?.(name)}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Select a country" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="us">United States</SelectItem>
+                    <SelectItem value="uk">United Kingdom</SelectItem>
+                    <SelectItem value="de">Germany</SelectItem>
+                </SelectContent>
+            </Select>
+            <FormyError field={name} below />
+        </div>
+    );
+}
+```
+
+Drop it directly inside a `<Formy>` form — no extra wiring needed:
+
+```tsx
+<Formy id="profile-form" action={profileAction}>
+    <CountrySelect name="country" />
+    <FormySubmit>Save</FormySubmit>
+</Formy>
+```
+
+> **Note:** `useErrorsContext` must be called inside a component that is rendered within a `<Formy>` boundary. Calling it outside will throw a developer-friendly error.
+
 ---
 
 ## API Reference
@@ -330,9 +393,8 @@ Renders field-specific or global error messages. Merges server errors and client
 | `validate` | `(value: string) => string \| null` | `undefined` | Client-side validator. Must be defined in a `'use client'` module. |
 | `below` | `boolean` | `false` | Positions the error below the input. Default is above. |
 | `absolute` | `boolean` | `true` | Absolute positioning to prevent layout shifts. Set `false` for in-flow rendering. |
-| `hasHelp` | `boolean` | `false` | Shows an interactive info icon with a tooltip next to the error. |
-| `helpText` | `string` | `""` | Static text inside the glassmorphism help tooltip. |
-| `parseMessage` | `(msg: string) => { title: string; info: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. |
+| `helpText` | `string` | `undefined` | Static text inside the glassmorphism help tooltip. (Mutually exclusive with `parseMessage`) |
+| `parseMessage` | `(msg: string) => { title: string; info?: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. (Mutually exclusive with `helpText`, `info` is optional) |
 
 ---
 
@@ -361,6 +423,26 @@ Renders children only when `state` contains the `data` discriminant.
 Wraps React 19's `useActionState`. Safely handles both Server Action functions and plain URL strings. Throws a developer-friendly error if the action type changes dynamically (which would violate React's Rules of Hooks).
 
 **Returns:** `[state, dispatch, isPending]`
+
+---
+
+### `useErrorsContext(name)`
+
+Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) with Formy's error system. Must be called inside a component rendered within a `<Formy>` boundary.
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `string` | The field name to subscribe to. Matches the `name` attribute of the corresponding input. |
+
+**Returns:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `error` | `string \| null` | The current error message for this field (server or client). Automatically reactive — re-renders only when this specific field's error changes. |
+| `clearFieldError` | `(name: string) => void \| undefined` | Clears the error for the given field. Call on `onValueChange` / `onChange` to dismiss errors when the user interacts. |
+| `registerValidator` | `fn \| undefined` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` instead. |
+
+> See [Pattern I](#pattern-i-third-party-ui-components-shadcn--radix) for a full usage example.
 
 ---
 

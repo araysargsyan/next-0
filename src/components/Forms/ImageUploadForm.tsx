@@ -1,7 +1,54 @@
+// import { useState, useEffect } from "react";
 import { uploadImagesAction } from "@/app/(home)/actions";
 import Formy, { FormyError, FormySubmit, FormySuccess } from "@/libs/formy";
+import { ProductNameSelect } from "./ProductNameSelect";
 
 export default function ImageUploadForm() {
+    /*
+     * NOTE: This block of code is a template for the immediate upload pattern.
+     * It is NOT ready for use because the backend API (/api/upload/temp) is not yet implemented.
+     *
+     * const [tempFileId, setTempFileId] = useState<string | null>(null);
+     *
+     * // Case 1: SPA navigation — useEffect cleanup
+     * useEffect(() => {
+     *     return () => {
+     *         if (tempFileId) {
+     *             fetch(`/api/upload/temp/${tempFileId}`, { method: "DELETE" }).catch(() => {});
+     *         }
+     *     };
+     * }, [tempFileId]);
+     *
+     * // Case 2: Normal tab close — sendBeacon
+     * useEffect(() => {
+     *     const handlePageHide = () => {
+     *         if (tempFileId) {
+     *             navigator.sendBeacon(`/api/upload/temp/${tempFileId}/delete`);
+     *         }
+     *     };
+     *     window.addEventListener("pagehide", handlePageHide);
+     *     return () => window.removeEventListener("pagehide", handlePageHide);
+     * }, [tempFileId]);
+     *
+     * const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+     *     const file = e.target.files?.[0];
+     *     if (!file) return;
+     *
+     *     try {
+     *         const formData = new FormData();
+     *         formData.append("file", file);
+     *         const res = await fetch("/api/upload/temp", {
+     *             method: "POST",
+     *             body: formData,
+     *         });
+     *         const { tempId } = await res.json();
+     *         setTempFileId(tempId);
+     *     } catch (err) {
+     *         console.error("Failed to upload temp file", err);
+     *     }
+     * };
+     */
+
     return (
         <div style={{ marginTop: "20px", padding: "20px", border: "1px solid #ccc", borderRadius: "8px" }}>
             <h3>Upload Product</h3>
@@ -11,18 +58,8 @@ export default function ImageUploadForm() {
                 clearOnSuccess={false}
                 className="relative flex flex-col"
             >
-                {/* Product Name Wrapper */}
-                <div className="relative mb-6">
-                    <label htmlFor="name" style={{ display: "block", marginBottom: "5px" }}>Product name:</label>
-                    <input
-                        id="name"
-                        name="name"
-                        type="text"
-                        defaultValue="New product"
-                        style={{ padding: "8px", width: "100%", borderRadius: "4px", border: "1px solid #ddd" }}
-                    />
-                    <FormyError field="name" below />
-                </div>
+                {/* Product Name — custom select via useErrorsContext (Pattern I) */}
+                <ProductNameSelect name="name" label="Product name:" />
 
                 {/* Price Wrapper */}
                 <div className="relative mb-6">

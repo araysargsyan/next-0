@@ -13,12 +13,11 @@ import {useFormyErrors} from "./hooks/useFormyErrors";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import {createLogger} from "@/libs/utils/logger";
 import {ErrosContext} from "./contexts/ErrorsContext";
-import until from "@/libs/utils/until";
 
 const log = createLogger("Formy", "magenta");
 console.log("Formy=SERVER RENDERING")
 const FormyCoreDynamic = dynamic(() =>
-    until(1000, ()=>console.log('start dynamic import')).then(() => import("./FormyCore").then(m => ({ default: m.FormyCore })))
+    import("./FormyCore").then(m => ({ default: m.FormyCore }))
 );
 
 export default function Formy<State extends FormyActionState & StrictFormyState<State> = FormyActionState>({
@@ -55,7 +54,10 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
     }>>({});
 
     const errorsContextValue = useMemo(
-        () => ({ store: errorsStore, registerValidator: (
+        () => ({
+            store: errorsStore,
+            clearFieldError,
+            registerValidator: (
                 name: string,
                 validateFn: (value: string) => string | null,
                 setErrorFn: (error: string | null) => void
@@ -64,8 +66,9 @@ export default function Formy<State extends FormyActionState & StrictFormyState<
                 return () => {
                     delete validatorsRef.current[name];
                 };
-            } }),
-        [errorsStore]
+            }
+        }),
+        [errorsStore, clearFieldError]
     );
 
     const usePersist = useContext(FormyPersistContext);

@@ -56,6 +56,7 @@ src/components/UI/Formy/
 10. **`usePersistedForm.bind(null, useStoreHook)` in `createPersistBridge`** — Eliminates wrapper hook, ESLint-compliant (`.bind()` is not a hook call), passes bound hook as context value.
 11. **Local validation state in `FormyError` (v8.0)** — `clientError` and `isEdited` states live inside each `FormyError` instance, not in the parent `Formy`. `registerValidator` accepts `setErrorFn` and `onEditFn` callbacks. Parent calls them directly via `validators.current` ref on input/submit — zero parent re-renders triggered by validation or field editing.
 12. **Discriminated union without success field for FormyActionState** (v9.0) — Eliminates dual-state boolean ambiguity by defining the action output as either having `error` or `data` property.
+13. **`FormyInput` component for controlled / lightweight mode** (v11.0) — Implemented `<FormyInput>` to encapsulate native `<input>` elements, register validators, and handle automatic error clearing on input/change via `clearFieldError` in context. This avoids duplicating event listening logic at the form level.
 
 ---
 
@@ -352,38 +353,235 @@ A controlled-input wrapper component for the render-prop/controlled mode that in
 - **Documentation:** Full analysis recorded in `../../src/libs/formy/TECHNICAL.md` § 7.
 - **Bundle Cleanup:** Moved `@next/bundle-analyzer` from `dependencies` to `devDependencies` in `package.json`.
 
+### 13. Controlled-Mode Error Clearing (RESOLVED)
+- **Solution:** Integrated `clearFieldError` into `FormyInput` via the `onInput`/`onChange` lifecycle. This ensures that field-specific errors are cleared as soon as the user interacts with the input, preventing the stale error flash during sequential submits in controlled mode.
+
 ---
 
 ## Current TODO List (as of July 10, 2026)
 
 ### 🔴 High Priority
 
-- [ ] **6.9. Error clearing for controlled inputs in lightweight/plainMode:**
-  Add `onInput`/`onChange` handlers to the `shouldBypassCore` branch in `Formy.tsx` that call `clearFieldError(target.name)` when user starts typing. Without this, server-side errors remain visible in controlled mode even after the user edits the field.
+- [x] **6.9. Error clearing for controlled inputs in lightweight/plainMode:**
+  Resolved via `<FormyInput>` component encapsulating its own `clearFieldError` calls.
+- [x] **6.7. Testing dynamic loading (FormyCore):**
+  - RSC/uncontrolled mode: verify dynamic chunk load, fieldset enable, value restoration on error.
+All key events now have color-coded `console.log` with `[Formy: <id>]` prefix:
 
-- [ ] **6.7. Testing dynamic loading (FormyCore):**
+| Color | Event |
+|:---|:---|
+| 🔵 Cyan | Every render (state snapshot) |
+| 🟢 Green | Mount hydration, success clear/restore |
+| 🟠 Orange | Input, change, checkbox, radio, select, file events |
+| 🟣 Purple | Field validation result (PASSED/FAILED) |
+| 🔴 Hot pink | Form submit |
+| 🔴 Red | Client validation failed |
+| 🔵 Teal | `restoreFromValues` DOM restoration |
+
+> **Note:** In React Strict Mode (dev only), the render body runs twice per render cycle. Double render logs are a Strict Mode artifact, not a bug.
+
+### 4.13. FormyActionState Simplification & Prop Cleanup (July 8, 2026)
+
+**Problem:** The `success` boolean field was redundant and created ambiguity about action results. Additionally, unused props (`submitLabel` / `loadingLabel`) cluttered the `<Formy>` component API.
+
+**Solution:** Removed the `success` field from `FormyActionState` and migrated all success checking logic to `"data" in state` pattern. The unused `submitLabel` and `loadingLabel` props were fully removed from the `<Formy>` component props interface while keeping explicit `<FormySubmit>` support intact.
+
+---
+
+## 5. What FormyContext Is Still Needed For
+
+`FormyContext` **cannot be replaced** by `useFormStatus`. The native hook only provides `pending`, `data`, `method`, `action` — not the returned Server Action state.
+
+Components that depend on `FormyContext`:
+- `FormyError` — reads `state.error` + calls `registerValidator`
+- `FormySuccess` — reads `state.data`
+- Render-prop `children` — receives `state, isPending`
+
+---
+
+## 6. Pending Items (TODO)
+
+### 6.1. File Input Limitation (Known, not critical)
+Browsers block programmatic setting of `<input type="file">` values for security. File inputs always reset on validation error.
+- **Current mitigation:** `savedFiles` ref captures the `FileList` on change and attempts restore via `DataTransfer` API.
+- **Limitation:** `DataTransfer`-based restore is not supported in all environments.
+
+### 6.2. Custom UI Component Compatibility
+Third-party UI libraries (Radix, Shadcn) hide native inputs. `querySelectorAll("input")` + `setNativeValue` won't reach them.
+- **When:** When such components are introduced into forms.
+
+### 6.3. Live Validation UX Improvements
+Validation fires on every keystroke (real-time). No debounce is applied yet.
+- **When:** Gradual, as UX requirements grow.
+
+---
+
+## 7. Current Form IDs in Use
+
+| Form | `id` prop | File |
+|:---|:---|:---|
+| Login | `login-form` | `src/components/Forms/LoginForm/index.tsx` |
+| Image Upload | `image-upload-form` | `src/components/Forms/ImageUploadForm.tsx` |
+
+*Last updated: July 8, 2026*
+
+## 6.4. Stale Error Flash on Sequential Submits (RESOLVED, July 5)
+
+**Symptom:**
+1. Submit #1 → Server Action returns a **global** error (e.g. `{ success: false, error: "Invalid credentials" }`).
+2. User edits a field, submits again → this time the error is **field-specific** (e.g. email error).
+3. On screen, for roughly a second, the **old global error re-appears**, then disappears, and only *after* that the **new field error** shows up on the email input.
+
+The same glitch happens in reverse — field error first, then a global error on the next submit — the stale one flashes before being replaced.
+
+**Suspected cause (per user):**
+In a previous update, a handler was added that clears the currently-displayed error once the user starts typing a new value into an input. The glitch is suspected to originate from this "clear error on input" handling.
+
+**Status:** Resolved. The reset of `editedFields` was moved from the start of the submission (when `resolvedIsPending` becomes `true`) to the end of the submission (when `resolvedIsPending` transitions from `true` to `false`). This ensures that the filtered stale errors remain hidden while the Server Action is running.
+
+### 6.5. Codebase Walkthrough & Hooks Discussion (RESOLVED, July 8, 2026)
+- **Symptom/Goal:** Detailed review of Formy's internal hook design to align on the lifecycle and state management.
+- **Status:** Resolved. All individual refs (`prevIsPending`, `savedValuesRef`, `savedFilesRef`, `isRestoringRef`, `hasHydrated`, `persistRef`) were consolidated into a single `localState` ref object with clear JSDoc explanations for each field.
+- **Action State Separation:** The transition tracking and DOM restoration effects were moved into `FormyCore`'s action state handler, registered into a parent-owned `onActionChangeRef` callback. This prevents `FormyCore` from re-rendering on parent `state` / `isPending` updates.
+
+### 6.6. Architectural Scope Issue: FormyCore is RSC-Only by Design (July 8, 2026)
+
+**Discovery:** During session review, we identified that **the entire FormyCore DOM manipulation layer exists exclusively to serve the RSC/uncontrolled input scenario**. This is not a limitation — it is the fundamental architectural purpose of Formy. However, it raises an important scope concern.
+
+**The Core Insight:**
+
+Formy's main goal is to keep `<input>` elements as **React Server Components (RSC)** — zero JS hydration for field layouts. The `<Formy>` client boundary wraps the form, while children (inputs, labels, layout divs) remain server-rendered static HTML.
+
+Because RSC inputs are **uncontrolled** (no `useState`, no `onChange` from React), the only way to restore their values after React 19's automatic `form.reset()` + RSC refresh is **direct DOM manipulation**. This is why `FormyCore` exists with its full DOM machinery.
+
+**The Problem with Controlled Inputs:**
+
+If a consumer creates a `'use client'` form (e.g., `LoginForm` with `useState` for each input) and wraps it in `<Formy>`, the following FormyCore internals become **dead weight** — code that runs but serves no purpose:
+
+| FormyCore Internals | Purpose (RSC scenario) | Needed for `useState` inputs? |
+|:---|:---|:---|
+| `savedValuesRef` | Snapshot DOM values before reset | ❌ Values live in React state |
+| `formRef.querySelectorAll("input")` | Discover uncontrolled inputs in DOM | ❌ React already tracks them |
+| `setNativeValue` / `setNativeChecked` | Restore values via native DOM setters | ❌ `setValue(x)` triggers re-render |
+| `isRestoringRef` guard | Prevent infinite loops during DOM restoration | ❌ No DOM restoration occurs |
+| `handleInput` / `handleChange` interception | Capture input from uncontrolled elements | ❌ `onChange` already manages state |
+| `restoreFromValues` useEffect | DOM restoration on `isPending: true→false` | ❌ Just `setState(savedValue)` |
+| `prevIsPending` ref | Detect action completion transition | ❌ Not needed without DOM restoration |
+
+With controlled inputs, the entire restoration logic collapses to a single line: `setEmail(savedEmail)`.
+
+**Why alternatives to `setNativeValue` don't work for RSC inputs:**
+
+1. **`defaultValue` via server response** — `useActionState` is a client hook; RSC inputs cannot access it. And `children` is opaque `ReactNode` — the client `<Formy>` parent cannot inject props into RSC children.
+2. **`onSubmit` + `e.preventDefault()`** — Prevents `form.reset()` but not the RSC refresh, which re-renders inputs with original `defaultValue`.
+3. **React Context** — RSC cannot consume context (`useContext` is client-only).
+4. **`useOptimistic` / render props** — Both require inputs to become client components, defeating the purpose.
+
+**Conclusion:** `setNativeValue` / `setNativeChecked` via native property descriptors is the **only viable best practice** for restoring uncontrolled RSC input values. All alternatives collapse into "make inputs client-side," which contradicts Formy's core architectural goal.
+
+**Resolution (July 8, 2026):** We implemented **Option 2 (Lightweight mode)** with dynamic importing:
+1. **Dynamic FormyCore Loading:** In `Formy.tsx`, we inspect the `children` type.
+   - If `children` is a function (controlled/render-prop mode) → we render a lightweight `<form>` or `<Form>` directly. The heavy DOM restoration logic and helpers are **not imported or loaded** at all.
+   - If `children` is a `ReactNode` (RSC/uncontrolled mode) → we dynamically import `FormyCore` (using `next/dynamic` with `ssr: true` default). All DOM-handling refs, hooks, and effects are encapsulated inside `FormyCore.tsx`.
+2. **Zero-Rerender Loading Barrier:** During the dynamic loading of `FormyCore`, the form contents are wrapped in `<fieldset ref={fieldsetRef} disabled style={{ display: "contents" }}>` *inside* `FormyCore`.
+   - On the server and initial client paint, the fieldset is natively `disabled`.
+   - When the `FormyCore` chunk finishes loading and mounts on the client, it directly sets `fieldsetRef.current.disabled = false` inside its mount effect.
+   - This avoids any React state updates (`useState`) or parent component re-renders, adhering fully to the **Zero-Rerender** architecture of Formy.
+
+**Status:** Resolved. Full documentation: `../../src/libs/formy/TECHNICAL.md`
+
+### 6.7. Testing Dynamic Loading Changes (HIGH PRIORITY)
+
+Current dynamic loading implementation requires manual and automated verification before moving forward. See detailed checklist in `./FORMY_DYNAMIC_LOADING_REPORT.md` § 5.1.
+
+**Status:** Pending.
+
+### 6.8. Create `FormyInput` Component (NEXT FEATURE)
+
+A controlled-input wrapper component for the render-prop/controlled mode that integrates with Formy's error/validation system. Should handle:
+- Binding a controlled `<input>` to the validation registry (`registerValidator`)
+- Automatically clearing field errors on user input
+- Consistent error display styling
+
+**Proposed API:**
+
+```tsx
+<Formy action={loginAction}>
+    {(state, isPending) => (
+        <>
+            <FormyInput
+                name="email"
+                value={email}
+                onInput={setEmail}
+                validate={(v) => v.includes("@") ? null : "Invalid email"}
+            />
+            <FormyInput
+                name="password"
+                type="password"
+                value={password}
+                onInput={setPassword}
+                validate={(v) => v.length >= 8 ? null : "Min 8 characters"}
+            />
+            <FormySubmit>Sign In</FormySubmit>
+        </>
+    )}
+</Formy>
+```
+
+**Key design decisions to resolve:**
+- Should `FormyInput` render the error message itself, or delegate to a sibling `<FormyError>`?
+- Should it support uncontrolled mode too (just `name` + `validate`, no `value`/`onInput`)?
+- Integration with persist bridge in controlled mode
+
+**Status:** Pending design discussion.
+
+## 11. Architecture v10.0: `plainMode` Prop & SSR Decision Analysis (July 10, 2026)
+- **New Prop (`plainMode`):** Added `plainMode?: boolean` to `FormyProps`. When `true`, bypasses dynamic loading of `FormyCore` and renders a plain `<form>` / `<Form>` for ReactNode children directly. Ideal for forms without Server Actions (e.g. search forms, client-side fetch handlers).
+- **SSR Decision (`ssr: true` vs `ssr: false`):** Conducted a thorough analysis of `ssr: false` with a skeleton fallback rendering `children`. Concluded that `ssr: true` is the only architecturally sound approach for Formy's uncontrolled mode due to:
+  1. DOM Swap/Unmount overhead (React destroys and recreates input DOM nodes on chunk load).
+  2. No server CPU savings (children still rendered inside the skeleton fallback).
+  3. TTI delay due to missing `<link rel="preload">` for the chunk.
+  4. Browser autofill/password manager compatibility issues.
+- **Documentation:** Full analysis recorded in `../../src/libs/formy/TECHNICAL.md` § 7.
+- **Bundle Cleanup:** Moved `@next/bundle-analyzer` from `dependencies` to `devDependencies` in `package.json`.
+
+### 13. Controlled-Mode Error Clearing (RESOLVED)
+- **Solution:** Integrated `clearFieldError` into `FormyInput` via the `onInput`/`onChange` lifecycle. This ensures that field-specific errors are cleared as soon as the user interacts with the input, preventing the stale error flash during sequential submits in controlled mode.
+
+---
+
+## Current TODO List (as of July 10, 2026)
+
+### 🔴 High Priority
+
+- [x] **6.9. Error clearing for controlled inputs in lightweight/plainMode:**
+  Resolved via `<FormyInput>` component encapsulating its own `clearFieldError` calls.
+- [x] **6.7. Testing dynamic loading (FormyCore):**
   - RSC/uncontrolled mode: verify dynamic chunk load, fieldset enable, value restoration on error.
   - Render-prop/controlled mode: verify `FormyCore` chunk is NOT downloaded (Network tab).
   - `plainMode`: verify ReactNode children render without chunk loading.
-
-- [ ] **Remove `until(1000)` debug delay before production:**
+- [x] **Remove `until(1000)` debug delay before production:**
   The artificial delay in `Formy.tsx` dynamic import is strictly for development testing of the zero-rerender loading barrier.
 
 ### 🟡 Medium Priority
 
-- [ ] **6.8. Create `FormyInput` component:**
-  A controlled-input wrapper for render-prop/controlled mode with automatic validation registry binding, error clearing on input, and consistent error display styling. Proposed API documented in session § 6.8 above.
-
-- [ ] **File input restoration limitations:**
-  `DataTransfer`-based restore for `<input type="file">` is not supported in all environments. Needs testing and documentation of edge cases.
+- [x] **6.8. Create `FormyInput` component:**
+  A controlled-input wrapper for render-prop/controlled mode with automatic validation registry binding, error clearing on input, and consistent error display styling.
 
 ### 🟢 Low Priority / Future
 
-- [ ] **Third-party UI library compatibility (Shadcn / Radix):**
-  Components with hidden native inputs (custom Select, Checkbox) may not be intercepted by `querySelectorAll("input")`. Needs investigation when such components are introduced.
+- [x] **Third-party UI library compatibility (Shadcn / Radix):**
+  Resolved via `useErrorsContext(name)` hook — now exported as public API from `index.ts`. Custom components wrap the Radix/Shadcn element, call `clearFieldError` on `onValueChange`, and render `<FormyError>` as a sibling. Full example in `README.md` Pattern I and `TECHNICAL.md` § 9.
 
 - [ ] **Client-side validation debounce:**
   Currently validation fires on every keystroke. For async checks (e.g. email uniqueness) a debounce mechanism is needed.
+
+- [x] **File input restoration limitations (RESOLVED, July 10, 2026):**
+  Removed programmatic DataTransfer file restoration from FormyCore due to security restrictions and poor cross-browser reliability. Instead, the established best practice for file inputs is to upload files immediately to temporary storage on input change, and manage cleanup across three layers:
+  1. `useEffect` cleanup for SPA/client-side navigation.
+  2. `sendBeacon` in `pagehide` for normal tab/browser closures.
+  3. Server Cron/TTL cleanup job (e.g., 2 hours) as a safety net for crashes, network drops, and power loss.
+  A non-functional template illustrating this pattern was added to `ImageUploadForm.tsx`.
 
 ---
 

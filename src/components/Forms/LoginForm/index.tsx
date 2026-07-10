@@ -47,7 +47,6 @@ export default function LoginForm() {
                 <FormyError
                     field="password"
                     below
-                    hasHelp
                     parseMessage={parsePasswordMessage}
                     validate={validatePassword}
                 />

@@ -173,10 +173,55 @@ For Formy's uncontrolled mode, `ssr: true` is the only way to achieve seamless S
 To maintain its stateless parent behavior and avoid trigger-happy re-renders, `FormyCore` encapsulates mutable, non-rendering lifecycle flags and snapshots in a unified `localState` reference object:
 
 - **`savedValues`**: Snapshot of all form field values (name → value) captured at submit time in `handleSubmit`. Fallback source for DOM restoration when the persist store is not connected.
-- **`savedFiles`**: Snapshot of `File` objects per file-input name, captured in `handleChange`. Used to restore files via the `DataTransfer` API (as browser security policies block programmatic value assignment for file inputs).
 - **`isRestoring`**: Guard flag set to `true` during DOM restoration. Prevents infinite event loops from synthetic events dispatched by `setNativeValue` / `setNativeChecked`.
 - **`hasHydrated`**: Mount hydration flag. Prevents double-hydration side-effects under React 19's Strict Mode in development.
 - **`persist`**: Fresh reference to the `FormyPersistAdapter` prop, allowing callbacks and effects to read the latest store adapter without requiring it in dependency arrays.
+
+---
+
+## 9. Third-party UI Component Compatibility (Shadcn / Radix)
+
+### Three tiers of form children in Next.js App Router
+
+| Tier | Example | JS on client? | Formy restoration? |
+| :--- | :--- | :--- | :--- |
+| **RSC (pure static)** | `<input name="email" />` rendered in a Server Component | ❌ Zero | ✅ Full — `setNativeValue` |
+| **Native HTML elements** | `<input>`, `<textarea>`, native `<select>` | ❌ Zero | ✅ Full — `setNativeValue` |
+| **Shadcn / Radix components** | `<Select>`, `<Checkbox>`, `<Switch>` | ✅ Required | ⚠️ See below |
+
+### Why Shadcn / Radix always require `'use client'`
+
+Radix and Shadcn components always ship with `'use client'` for two reasons:
+
+1. **Interactivity** — they manage open/close state, animations, and pointer events that cannot exist in static HTML.
+2. **Accessibility** — keyboard navigation (arrow keys, Enter, Escape) and ARIA attributes are driven by JavaScript event handlers.
+
+### `'use client'` does NOT disable SSR
+
+A common misconception: `'use client'` in Next.js does **not** mean "skip server rendering". Next.js still renders the component tree on the server (SSR + hydration). The directive only marks the hydration boundary — the component ships with its JS bundle and hydrates on the client. The server-rendered HTML of a Radix `<Select>` is still present in the initial page, which is good for SEO and FCP/LCP.
+
+### How to integrate with Formy
+
+`setNativeValue` restores the hidden underlying `<input>` that Radix injects into the DOM, but it does **not** trigger a re-render of the Radix component's visual state (the custom trigger button). This is expected — Radix manages its own visual state via its own React state, which is outside Formy's reach.
+
+The correct integration pattern is to wrap the Radix component in a thin `'use client'` wrapper that calls `useErrorsContext(name)`. This gives the component direct access to the field's current error and `clearFieldError` without any prop-drilling or form-level event duplication:
+
+```tsx
+'use client'
+import { useErrorsContext } from "@/libs/formy";
+
+export function CountrySelect({ name }: { name: string }) {
+    const { clearFieldError } = useErrorsContext(name);
+
+    return (
+        <Select name={name} onValueChange={() => clearFieldError?.(name)}>
+            ...
+        </Select>
+    );
+}
+```
+
+This component can then be dropped directly into any `<Formy>` form — RSC mode or controlled mode — without additional wiring.
 
 ---
 

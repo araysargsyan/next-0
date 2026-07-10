@@ -9,8 +9,10 @@ export { createPersistBridge } from "./utils/createPersistBridge";
 
 // Hooks — advanced usage
 export { useFormyActionState } from "./hooks/useFormyActionState";
+export { useErrorsContext } from "./contexts/ErrorsContext";
 
 // Components
 export { FormyError } from "./components/FormyError";
 export { FormySubmit } from "./components/FormySubmit";
 export { FormySuccess } from "./components/FormySuccess";
+export { FormyInput } from "./components/FormyInput";

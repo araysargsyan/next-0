@@ -29,9 +29,6 @@ const FormyCoreInner = ({
         /** Fallback value snapshot for DOM restoration when store is disconnected. */
         savedValues: {} as Record<string, string>,
 
-        /** File snapshots captured to restore via DataTransfer API. */
-        savedFiles: {} as Record<string, File[]>,
-
         /** Guard to prevent event loop during DOM restoration. */
         isRestoring: false,
 
@@ -72,23 +69,6 @@ const FormyCoreInner = ({
                 setNativeValue(el, values[el.name]);
             }
         });
-
-        // Restore file inputs from the local ref using DataTransfer
-        formEl.querySelectorAll('input[type="file"]').forEach((el) => {
-            if (el instanceof HTMLInputElement) {
-                const files = localState.current.savedFiles[el.name];
-                if (files && files.length > 0) {
-                    try {
-                        const dt = new DataTransfer();
-                        files.forEach((file) => dt.items.add(file));
-                        el.files = dt.files;
-                        el.dispatchEvent(new Event("change", {bubbles: true}));
-                    } catch (err) {
-                        console.error("Formy: failed to restore file input", err);
-                    }
-                }
-            }
-        });
     }, [id]);
 
     // Hydrate field values from the persist adapter on mount
@@ -126,7 +106,6 @@ const FormyCoreInner = ({
                     log(`[${id ?? "anonymous"}] action succeeded, clearing state`);
                     localState.current.persist.clear();
                     localState.current.savedValues = {};
-                    localState.current.savedFiles = {};
                 } else if (formRef.current) {
                     log(`[${id ?? "anonymous"}] action succeeded, restoring final values`);
                     localState.current.isRestoring = true;
@@ -247,10 +226,6 @@ const FormyCoreInner = ({
                     log(`[${id ?? "anonymous"}] select changed [${target.name}]:`, target.value);
                     setValue(target.name, target.value);
                     runFieldValidation(target.name, target.value);
-                } else if (target instanceof HTMLInputElement && target.type === "file") {
-                    const filesList = target.files ? Array.from(target.files) : [];
-                    log(`[${id ?? "anonymous"}] file selected [${target.name}]:`, filesList);
-                    localState.current.savedFiles[target.name] = filesList;
                 }
             }
         }
