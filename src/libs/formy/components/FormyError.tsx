@@ -4,21 +4,11 @@ import { memo, useEffect, useState } from "react";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/libs/utils/logger";
 import {useErrorsContext} from "../contexts/ErrorsContext";
+import { FormyErrorProps } from "../types";
 
 const log = createLogger("FormyError", "red");
 
-type FormyErrorBaseProps = {
-    field?: string;
-    below?: boolean;
-    absolute?: boolean;
-    validate?: (value: string) => string | null;
-};
 
-type FormyErrorProps = FormyErrorBaseProps & (
-    | { helpText: string; parseMessage?: never }
-    | { helpText?: never, parseMessage: (message: string) => { title: string; info?: string } }
-    | { helpText?: never; parseMessage?: never }
-);
 
 export const FormyError = memo(function FormyError({
     field = '__global__',

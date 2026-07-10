@@ -32,3 +32,15 @@ export const useErrorsContext = (key: string) => {
 
     return { error, registerValidator: ctx.registerValidator, clearFieldError: ctx.clearFieldError };
 };
+
+export const useErrorsActionsContext = () => {
+    const ctx = useContext(ErrosContext);
+    if (!ctx) {
+        throw new Error("useErrorsActionsContext must be used within a <Formy> component.");
+    }
+    return {
+        clearFieldError: ctx.clearFieldError,
+        registerValidator: ctx.registerValidator,
+    };
+};
+

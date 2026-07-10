@@ -17,7 +17,6 @@ export interface FormyProps<State extends FormyActionState & StrictFormyState<St
     children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
     onStateChange?: (state: State | null, router: ReturnType<typeof useRouter>) => void;
     clearOnSuccess?: boolean;
-    /** Bypasses FormyCore DOM orchestration and dynamic chunk loading. */
     plainMode?: boolean;
 }
 
@@ -57,3 +56,15 @@ export interface FormyCoreProps extends Omit<
     persist: FormyPersistAdapter;
     onActionChangeRef: RefObject<OnActionChangeFn | null>;
 }
+
+type FormyErrorBaseProps = {
+    field?: string;
+    below?: boolean;
+    absolute?: boolean;
+    validate?: (value: string) => string | null;
+};
+
+export type FormyErrorProps = FormyErrorBaseProps & (
+    | { helpText?: string; parseMessage?: never }
+    | { helpText?: never, parseMessage?: (message: string) => { title: string; info?: string } }
+);

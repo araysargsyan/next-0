@@ -1,8 +1,10 @@
 "use client";
 
-import { useErrorsContext } from "../contexts/ErrorsContext";
+// import { useErrorsActionsContext } from "../contexts/ErrorsContext";
 import { FormyError } from "./FormyError";
-import type { InputEvent, ChangeEvent, ComponentProps } from "react";
+import type {InputEvent, ChangeEvent, ComponentProps} from "react";
+import type {FormyErrorProps} from "../types";
+import {useErrorsContext} from "../contexts/ErrorsContext";
 
 interface FormyInputProps extends ComponentProps<"input"> {
     name: string;
@@ -37,6 +39,19 @@ export function FormyInput({
         props.onChange?.(e);
     };
 
+    const formyErrorProps: FormyErrorProps = {
+        field: name,
+        below: errorBelow,
+        absolute: errorAbsolute,
+        validate: validate,
+    }
+    if (errorParseMessage) {
+        formyErrorProps.parseMessage = errorParseMessage;
+    }
+    if (errorHelpText) {
+        formyErrorProps.helpText = errorHelpText;
+    }
+
     return (
         <div className={containerClassName}>
             <input
@@ -46,14 +61,7 @@ export function FormyInput({
                 onChange={handleChange}
                 {...props}
             />
-            <FormyError
-                field={name}
-                below={errorBelow}
-                absolute={errorAbsolute}
-                helpText={errorHelpText || undefined}
-                parseMessage={errorParseMessage}
-                validate={validate}
-            />
+            <FormyError {...formyErrorProps} />
         </div>
     );
 }

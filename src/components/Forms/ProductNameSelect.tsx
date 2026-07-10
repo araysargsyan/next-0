@@ -5,6 +5,7 @@ import { useErrorsContext } from "@/libs/formy";
 import { FormyError } from "@/libs/formy";
 
 const PRODUCT_NAMES = [
+    "",
     "New Product",
     "Limited Edition",
     "Premium Pack",

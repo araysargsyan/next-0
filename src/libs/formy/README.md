@@ -318,7 +318,7 @@ Use `useErrorsContext` to connect any custom component to Formy's error system. 
 'use client'
 
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useErrorsContext } from "@/libs/formy";
+import { useErrorsActionsContext } from "@/libs/formy";
 import { FormyError } from "@/libs/formy";
 
 interface CountrySelectProps {
@@ -327,7 +327,7 @@ interface CountrySelectProps {
 }
 
 export function CountrySelect({ name, defaultValue }: CountrySelectProps) {
-    const { clearFieldError } = useErrorsContext(name);
+    const { clearFieldError } = useErrorsActionsContext();
 
     return (
         <div className="relative">
@@ -443,6 +443,14 @@ Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) wi
 | `registerValidator` | `fn \| undefined` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` instead. |
 
 > See [Pattern I](#pattern-i-third-party-ui-components-shadcn--radix) for a full usage example.
+
+---
+
+### `useErrorsActionsContext()`
+
+A lightweight alternative to `useErrorsContext` when you only need helper methods like `clearFieldError` and do not need to read the reactive `error` state. Calling this hook does **not** trigger component re-renders when the form's error state changes.
+
+**Returns:** `{ clearFieldError, registerValidator }`
 
 ---
 
