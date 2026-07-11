@@ -4,7 +4,7 @@ import {useContext, useEffect, useRef, useMemo} from "react";
 import type {SubmitEvent} from "react";
 import Form from "next/form";
 import dynamic from "next/dynamic";
-import type {FormyActionState, FormyProps, OnActionChangeFn} from "./types";
+import type {FormyProps, OnActionChangeFn} from "./types";
 import {FormyContext} from "./contexts/FormyContext";
 import {FormyPersistContext} from "./contexts/FormyPersistContext";
 import {useFormyActionState} from "./hooks/useFormyActionState";
@@ -19,9 +19,9 @@ const FormyCoreDynamic = dynamic(() =>
 );
 
 const log = createLogger("Formy", "magenta");
-export default function Formy<State extends FormyActionState = FormyActionState>({
+export default function Formy({
     action,
-    initialState = null,
+    initialState = { data: null },
     children,
     onStateChange,
     className = "flex flex-col gap-4 w-full max-w-sm",
@@ -29,7 +29,7 @@ export default function Formy<State extends FormyActionState = FormyActionState>
     plainMode = false,
     onLoad: _onLoad,
     ...props
-}: FormyProps<State>) {
+}: FormyProps) {
     useIsomorphicLayoutEffect(() => {
         log(`[${props.id ?? "anonymous"}] 🔄 Formy render`);
     });
@@ -37,7 +37,7 @@ export default function Formy<State extends FormyActionState = FormyActionState>
     const formRef = useRef<HTMLFormElement>(null);
     const onActionChangeRef = useRef<OnActionChangeFn | null>(null);
 
-    const [state, formAction, isPending] = useFormyActionState<State>(action, initialState);
+    const [state, formAction, isPending] = useFormyActionState(action, initialState);
 
     const { errorsStore, clearFieldError } = useFormyErrorStore(state, isPending);
 
@@ -69,7 +69,7 @@ export default function Formy<State extends FormyActionState = FormyActionState>
     const persist = usePersist(props.id ?? "");
 
     useEffect(() => {
-        if (onStateChange && state !== null) {
+        if (onStateChange) {
             onStateChange(state);
         }
     }, [state, onStateChange]);

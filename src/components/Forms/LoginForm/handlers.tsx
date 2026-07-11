@@ -1,18 +1,5 @@
 'use client'
 
-import { useRouter } from "next/navigation";
-import { FormyActionState } from "@/libs/formy";
-
-export const handleStateChange = (
-    state: FormyActionState | null,
-    router: ReturnType<typeof useRouter>
-) => {
-    if (state && "data" in state) {
-        localStorage.setItem("was_logged_in", "true");
-        router.push("/");
-    }
-};
-
 export const parsePasswordMessage = (msg: string) => {
     const dotIndex = msg.indexOf(". ");
     if (dotIndex !== -1) {

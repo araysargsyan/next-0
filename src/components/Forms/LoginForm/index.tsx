@@ -1,21 +1,18 @@
 import { Suspense } from "react";
-import { useRouter } from "next/navigation";
 import { signInAction } from "@/app/sign-in/actions";
 import Formy, { FormyError, FormySubmit } from "@/libs/formy";
 import InfoMessage from "./InfoMessage";
-import { handleStateChange, parsePasswordMessage } from "./handlers";
+import { parsePasswordMessage } from "./handlers";
 import {validateEmail, validatePassword} from "./validators";
 
 export const dynamic = "force-static";
 
 export default function LoginForm() {
-    const router = useRouter();
     return (
         <Formy
             id="login-form"
             action={signInAction}
             className="flex flex-col"
-            onStateChange={(state) => handleStateChange(state, router)}
         >
             <h1 className="text-2xl font-bold text-center text-gray-900 mb-4">Sign in</h1>
 

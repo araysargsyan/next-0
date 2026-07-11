@@ -1,14 +1,14 @@
 "use client";
 
 import {useActionState, useState, ComponentProps} from "react";
-import type { FormyActionState } from "../types";
+import {FormyAction, FormyActionState} from "../types";
 import Form from "next/form";
 
 export function useFormyActionState<State extends FormyActionState = FormyActionState>(
-    action: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>) | undefined,
-    initialState: Awaited<State> | null
+    action: string | undefined | FormyAction<State>,
+    initialState: Awaited<State>
 ): [
-    state: Awaited<State> | null,
+    state: Awaited<State>,
     dispatch: ComponentProps<typeof Form>['action'] | undefined,
     isPending: boolean
 ] {

@@ -4,11 +4,11 @@ import { protFetch } from "@/libs/auth";
 import { revalidatePath } from "next/cache";
 import { createLogger } from "@/libs/utils/logger";
 import { parseApiError } from "@/helpers/parseApiError";
-import {FormyActionState} from "@/libs/formy";
+import {FormyAction} from "@/libs/formy";
 
 const log = createLogger('UploadAction', 'magenta');
 
-export async function uploadImagesAction(_prevState: unknown, formData: FormData): Promise<FormyActionState> {
+export const uploadImagesAction: FormyAction = async (_prevState, formData) => {
     const name = formData.get("name") as string;
     log(`[START]: (${name || 'unknown'})`, "Processing image upload...");
 

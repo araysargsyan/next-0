@@ -2,7 +2,7 @@ export { default } from "./Formy";
 
 // Types — public API
 export type {
-    FormyActionState,
+    FormyAction,
     FormyProps,
     FormyStoreSlice,
     FormyPersistAdapter,

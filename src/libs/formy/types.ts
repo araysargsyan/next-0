@@ -1,16 +1,19 @@
 import type {ReactNode, ComponentProps, RefObject} from "react";
 import Form from "next/form";
 
-export type FormyActionState =
-    | { error: string | Record<string, string> | null }
-    | { data: unknown };
+export type FormyActionState = { error: string | Record<string, string> | null }
+    | { data: unknown }
+    | void;
+
+export type FormyAction<State extends FormyActionState = FormyActionState> =
+    ((state: Awaited<State>, payload: FormData) => State | Promise<State>)
 
 export interface FormyProps<State extends FormyActionState = FormyActionState>
     extends Omit<ComponentProps<typeof Form>, "children" | "action"> {
-    action?: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>);
-    initialState?: Awaited<State> | null;
-    children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
-    onStateChange?: (state: State | null) => void;
+    action?: string | FormyAction<State>;
+    initialState?: Awaited<State>;
+    children?: ReactNode | ((state: Awaited<State>, isPending: boolean) => ReactNode);
+    onStateChange?: (state: Awaited<State>) => void;
     clearOnSuccess?: boolean;
     plainMode?: boolean;
 }

@@ -4,14 +4,17 @@ import { API_URL } from "@/config";
 import { AuthService } from "@/libs/auth";
 import { createLogger } from "@/libs/utils/logger";
 import { parseApiError, ParsedApiError } from "@/helpers/parseApiError";
-import {FormyActionState} from "@/libs/formy";
+import {redirect} from "next/navigation";
+import {FormyAction} from "@/libs/formy";
 
 const log = createLogger('SignInAction', 'magenta');
 
-export async function signInAction(_prevState: unknown, formData: FormData): Promise<FormyActionState> {
+export const signInAction: FormyAction = async(_prevState, formData) => {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     log(`[START]: (${email})`, { email });
+
+    let shouldRedirect = false;
 
     try {
         const res = await fetch(`${API_URL}/api/auth/sign-in`, {
@@ -41,9 +44,13 @@ export async function signInAction(_prevState: unknown, formData: FormData): Pro
         }
 
         log(`[FINISH]: (${email}) ->`, "Success");
-        return { data: null };
+        shouldRedirect = true;
     } catch (e) {
         log(`[ERROR]: (${email}) ->`, "Critical failure", String(e));
         return { error: "Something went wrong. Please try again later." };
+    }
+
+    if (shouldRedirect) {
+        redirect("/?was_logged_in=true");
     }
 }
