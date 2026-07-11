@@ -21,7 +21,7 @@ const FormyCoreDynamic = dynamic(() =>
 const log = createLogger("Formy", "magenta");
 export default function Formy({
     action,
-    initialState = { data: null },
+    initialState = null,
     children,
     onStateChange,
     className = "flex flex-col gap-4 w-full max-w-sm",

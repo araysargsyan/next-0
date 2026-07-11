@@ -3,7 +3,7 @@ import Form from "next/form";
 
 export type FormyActionState = { error: string | Record<string, string> | null }
     | { data: unknown }
-    | void;
+    | void | null;
 
 export type FormyAction<State extends FormyActionState = FormyActionState> =
     ((state: Awaited<State>, payload: FormData) => State | Promise<State>)
@@ -11,7 +11,7 @@ export type FormyAction<State extends FormyActionState = FormyActionState> =
 export interface FormyProps<State extends FormyActionState = FormyActionState>
     extends Omit<ComponentProps<typeof Form>, "children" | "action"> {
     action?: string | FormyAction<State>;
-    initialState?: Awaited<State>;
+    initialState?: Awaited<State> | null;
     children?: ReactNode | ((state: Awaited<State>, isPending: boolean) => ReactNode);
     onStateChange?: (state: Awaited<State>) => void;
     clearOnSuccess?: boolean;

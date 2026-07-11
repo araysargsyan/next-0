@@ -6,9 +6,9 @@ import Form from "next/form";
 
 export function useFormyActionState<State extends FormyActionState = FormyActionState>(
     action: string | undefined | FormyAction<State>,
-    initialState: Awaited<State>
+    initialState: Awaited<State>,
 ): [
-    state: Awaited<State>,
+    state: Awaited<State> | null,
     dispatch: ComponentProps<typeof Form>['action'] | undefined,
     isPending: boolean
 ] {
