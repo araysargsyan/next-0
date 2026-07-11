@@ -1,10 +1,9 @@
 "use client";
 
-// import { useErrorsActionsContext } from "../contexts/ErrorsContext";
 import { FormyError } from "./FormyError";
 import type {InputEvent, ChangeEvent, ComponentProps} from "react";
 import type {FormyErrorProps} from "../types";
-import {useErrorsContext} from "../contexts/ErrorsContext";
+import {useFormyErrors} from "../hooks/useFormyErrors";
 
 interface FormyInputProps extends ComponentProps<"input"> {
     name: string;
@@ -27,7 +26,7 @@ export function FormyInput({
     className = "w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black",
     ...props
 }: FormyInputProps) {
-    const { clearFieldError } = useErrorsContext(name);
+    const { clearFieldError } = useFormyErrors(name);
 
     const handleInput = (e: InputEvent<HTMLInputElement>) => {
         clearFieldError?.(name);

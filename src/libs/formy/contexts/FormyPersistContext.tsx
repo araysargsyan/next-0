@@ -1,17 +1,10 @@
 import { createContext } from "react";
-import type { FormyPersistAdapter } from "../types";
-
-/**
- * Hook adapter: accepts a formId, returns a persist adapter object.
- * The concrete implementation (Zustand, Redux, etc.) is injected
- * into this context externally, e.g. via FormStoreProvider.
- */
-export type FormyPersistHook = (formId: string) => FormyPersistAdapter;
+import {FormyPersistHook} from "../types";
 
 const noopPersistHook: FormyPersistHook = () => ({
     getValues: () => undefined,
-    setValue: () => {},
-    clear: () => {},
+    setValue: () => undefined,
+    clear: () => undefined,
 });
 
 /**

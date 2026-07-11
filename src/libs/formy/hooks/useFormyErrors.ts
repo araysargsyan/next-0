@@ -1,39 +1,23 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
-import { createErrorsStore } from "../utils/createErrorsStore";
-import type { FormyActionState } from "../types";
+import {useContext, useSyncExternalStore} from "react";
+import { ErrosContext } from "../contexts/ErrorsContext";
 
-export function useFormyErrors(state: FormyActionState | null, isPending: boolean) {
-    const errors = useMemo(() => {
-        const stateError = state && "error" in state ? state.error : null;
+export const useFormyErrors = (key: string) => {
+    const ctx = useContext(ErrosContext);
+    if (!ctx) {
+        throw new Error("useErrorsContext must be used within a <Formy> component.");
+    }
 
-        return isPending
-                ? null : typeof stateError === 'string'
-                    ? {'__global__': stateError}
-                    : stateError || null;
-    }, [isPending, state]);
+    // Key part: getSnapshot is scoped to a SPECIFIC key.
+    // useSyncExternalStore will compare the new value with the old one
+    // and skip re-renders if THIS specific key didn't change —
+    // even if the store notified all subscribers at once.
+    const error = useSyncExternalStore(
+        ctx.store.subscribe,
+        () => ctx.store.getSnapshot()?.[key] || null,
+        () => ctx.store.getSnapshot()?.[key] || null,
+    );
 
-    const [errorsStore] = useState(() => createErrorsStore(errors));
-    
-    useEffect(() => {
-        errorsStore.setErrors(errors);
-    }, [errors, errorsStore]);
-
-    const clearFieldError = useCallback((name: string) => {
-        const currentErrors = errorsStore.getSnapshot();
-        if (!currentErrors) return;
-
-        if (currentErrors['__global__']) {
-            const newErrors = { ...currentErrors };
-            delete newErrors['__global__'];
-            errorsStore.setErrors(Object.keys(newErrors).length > 0 ? newErrors : null);
-        } else if (currentErrors[name]) {
-            const newErrors = { ...currentErrors };
-            delete newErrors[name];
-            errorsStore.setErrors(Object.keys(newErrors).length > 0 ? newErrors : null);
-        }
-    }, [errorsStore]);
-
-    return { errorsStore, clearFieldError };
-}
+    return { error, registerValidator: ctx.registerValidator, clearFieldError: ctx.clearFieldError };
+};

@@ -4,13 +4,13 @@ import {useActionState, useState, ComponentProps} from "react";
 import type { FormyActionState } from "../types";
 import Form from "next/form";
 
-export function useFormyActionState<State extends FormyActionState>(
+export function useFormyActionState<State extends FormyActionState = FormyActionState>(
     action: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>) | undefined,
     initialState: Awaited<State> | null
 ): [
     state: Awaited<State> | null,
     dispatch: ComponentProps<typeof Form>['action'] | undefined,
-    isPending: boolean | null
+    isPending: boolean
 ] {
     const isFunction = typeof action === "function";
     const [initialIsFunction] = useState(isFunction);
@@ -29,6 +29,6 @@ export function useFormyActionState<State extends FormyActionState>(
         return [state, dispatch, isPending];
     } else {
         const actionStr = typeof action === "string" ? action : undefined;
-        return [initialState, actionStr, null];
+        return [initialState, actionStr, false];
     }
 }

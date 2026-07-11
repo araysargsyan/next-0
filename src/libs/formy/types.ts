@@ -1,21 +1,16 @@
-import {ReactNode, ComponentProps, RefObject} from "react";
-import { useRouter } from "next/navigation";
+import type {ReactNode, ComponentProps, RefObject} from "react";
 import Form from "next/form";
 
 export type FormyActionState =
     | { error: string | Record<string, string> | null }
     | { data: unknown };
 
-export type StrictFormyState<T> = {
-    [K in keyof T]: K extends "error" | "data" ? T[K] : never
-};
-
-export interface FormyProps<State extends FormyActionState & StrictFormyState<State> = FormyActionState>
+export interface FormyProps<State extends FormyActionState = FormyActionState>
     extends Omit<ComponentProps<typeof Form>, "children" | "action"> {
     action?: string | ((state: Awaited<State> | null, payload: FormData) => State | Promise<State>);
     initialState?: Awaited<State> | null;
     children?: ReactNode | ((state: State | null, isPending: boolean) => ReactNode);
-    onStateChange?: (state: State | null, router: ReturnType<typeof useRouter>) => void;
+    onStateChange?: (state: State | null) => void;
     clearOnSuccess?: boolean;
     plainMode?: boolean;
 }
@@ -27,10 +22,11 @@ export interface FormyStoreSlice {
 }
 
 export interface FormyPersistAdapter {
-    getValues: () => Record<string, string> | undefined;
+    getValues: () => Record<string, string> | void;
     setValue: (name: string, value: string) => void;
     clear: () => void;
 }
+export type FormyPersistHook = (formId: string) => FormyPersistAdapter;
 
 export type GetStateFn<Store extends FormyStoreSlice = FormyStoreSlice> = () => Store;
 

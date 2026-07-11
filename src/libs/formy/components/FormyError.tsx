@@ -3,13 +3,10 @@
 import { memo, useEffect, useState } from "react";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/libs/utils/logger";
-import {useErrorsContext} from "../contexts/ErrorsContext";
 import { FormyErrorProps } from "../types";
+import {useFormyErrors} from "@/libs/formy";
 
 const log = createLogger("FormyError", "red");
-
-
-
 export const FormyError = memo(function FormyError({
     field = '__global__',
     below = false,
@@ -18,7 +15,7 @@ export const FormyError = memo(function FormyError({
     absolute = true,
     validate
 }: FormyErrorProps) {
-    const {error: stateError, registerValidator} = useErrorsContext(field);
+    const {error: stateError, registerValidator} = useFormyErrors(field);
     const [clientError, setClientError] = useState<string | null>(null);
 
     useIsomorphicLayoutEffect(() => {

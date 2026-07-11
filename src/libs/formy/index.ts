@@ -1,15 +1,20 @@
 export { default } from "./Formy";
 
 // Types — public API
-export type { FormyActionState, StrictFormyState, FormyProps, FormyStoreSlice, FormyPersistAdapter } from "./types";
+export type {
+    FormyActionState,
+    FormyProps,
+    FormyStoreSlice,
+    FormyPersistAdapter,
+    FormyPersistHook
+} from "./types";
 
 // Persist bridge — for custom store wiring
-export type { FormyPersistHook } from "./contexts/FormyPersistContext";
 export { createPersistBridge } from "./utils/createPersistBridge";
 
 // Hooks — advanced usage
 export { useFormyActionState } from "./hooks/useFormyActionState";
-export { useErrorsContext, useErrorsActionsContext } from "./contexts/ErrorsContext";
+export { useFormyErrors } from "./hooks/useFormyErrors";
 
 // Components
 export { FormyError } from "./components/FormyError";

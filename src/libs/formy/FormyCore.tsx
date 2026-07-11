@@ -4,6 +4,7 @@ import Form from "next/form";
 import type { FormyCoreProps } from "./types";
 import { createLogger } from "@/libs/utils/logger";
 import { setNativeValue, setNativeChecked } from "./utils/domHelpers";
+import { runFormValidation } from "./utils/validation";
 import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 
 const log = createLogger("FormyCore", "cyan");
@@ -164,14 +165,10 @@ const FormyCoreInner = ({
             log(`[${id ?? "anonymous"}] submitting form`, values);
 
             // Run client-side validation on submission
-            let hasErrors = false;
-            Object.entries(validatorsRef.current).forEach(([name, entry]) => {
-                const error = entry.validate(localState.current.savedValues[name] ?? "");
-                entry.setError(error);
-                if (error) {
-                    hasErrors = true;
-                }
-            });
+            const hasErrors = runFormValidation(
+                validatorsRef.current,
+                (name) => localState.current.savedValues[name] ?? ""
+            );
 
             if (hasErrors) {
                 log(`[${id ?? "anonymous"}] client validation failed`);
@@ -191,8 +188,8 @@ const FormyCoreInner = ({
             target instanceof HTMLSelectElement
         ) {
             if (target.name) {
-                clearFieldError(target.name);
                 if (target.type !== "file" && target.type !== "checkbox" && target.type !== "radio") {
+                    clearFieldError(target.name);
                     log(`[${id ?? "anonymous"}] input [${target.name}]:`, target.value);
                     setValue(target.name, target.value);
                     runFieldValidation(target.name, target.value);
@@ -211,8 +208,8 @@ const FormyCoreInner = ({
             target instanceof HTMLSelectElement
         ) {
             if (target.name) {
-                clearFieldError(target.name);
                 if (target instanceof HTMLInputElement && target.type === "checkbox") {
+                    clearFieldError(target.name);
                     log(`[${id ?? "anonymous"}] checkbox changed [${target.name}]:`, target.checked);
                     setValue(target.name, target.checked ? "true" : "false");
                     runFieldValidation(target.name, target.checked ? "true" : "false");

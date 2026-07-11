@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, RefObject } from "react";
-import { useErrorsContext } from "@/libs/formy";
+import { useFormyErrors } from "@/libs/formy";
 import { FormyError } from "@/libs/formy";
 
 const PRODUCT_NAMES = [
-    "",
     "New Product",
     "Limited Edition",
     "Premium Pack",
@@ -26,7 +25,7 @@ export function ProductNameSelect({
     defaultValue = PRODUCT_NAMES[0],
     label = "Product name:",
 }: ProductNameSelectProps) {
-    const { clearFieldError } = useErrorsContext(name);
+    const { clearFieldError } = useFormyErrors(name);
     const [isOpen, setIsOpen] = useState(false);
     const [selected, setSelected] = useState(defaultValue);
     const containerRef: RefObject<HTMLDivElement | null> = useRef(null);
