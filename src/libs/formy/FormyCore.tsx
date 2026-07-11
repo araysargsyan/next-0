@@ -13,7 +13,7 @@ const FormyCoreInner = ({
     children,
     className = "flex flex-col gap-4 w-full max-w-sm",
     clearFieldError,
-    formAction,
+    action,
     formRef,
     setValue,
     validatorsRef,
@@ -231,10 +231,10 @@ const FormyCoreInner = ({
         props.onChange?.(e);
     };
 
-    if (formAction) {
+    if (action) {
         return <Form
             ref={formRef}
-            action={formAction}
+            action={action}
             className={className}
             {...props}
             onSubmit={handleSubmit}

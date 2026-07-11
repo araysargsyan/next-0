@@ -8,8 +8,8 @@ export function useFormyActionState<State extends FormyActionState = FormyAction
     action: string | undefined | FormyAction<State>,
     initialState: Awaited<State>,
 ): [
-    state: Awaited<State> | null,
-    dispatch: ComponentProps<typeof Form>['action'] | undefined,
+    state: Awaited<State>,
+    dispatch: ComponentProps<typeof Form>['action'] | null,
     isPending: boolean
 ] {
     const isFunction = typeof action === "function";
@@ -28,7 +28,6 @@ export function useFormyActionState<State extends FormyActionState = FormyAction
         const [state, dispatch, isPending] = useActionState(action, initialState);
         return [state, dispatch, isPending];
     } else {
-        const actionStr = typeof action === "string" ? action : undefined;
-        return [initialState, actionStr, false];
+        return [initialState, action ?? null, false];
     }
 }

@@ -37,7 +37,7 @@ export default function Formy({
     const formRef = useRef<HTMLFormElement>(null);
     const onActionChangeRef = useRef<OnActionChangeFn | null>(null);
 
-    const [state, formAction, isPending] = useFormyActionState(action, initialState);
+    const [state, resolvedAction, isPending] = useFormyActionState(action, initialState);
 
     const { errorsStore, clearFieldError } = useFormyErrorStore(state, isPending);
 
@@ -103,10 +103,10 @@ export default function Formy({
         <FormyContext.Provider value={{state, isPending}}>
             <ErrosContext.Provider value={errorsContextValue}>
                 {shouldBypassCore ? (
-                    formAction ? (
+                    resolvedAction ? (
                         <Form
                             ref={formRef}
-                            action={formAction}
+                            action={resolvedAction}
                             className={className}
                             {...props}
                             onSubmit={handleLightSubmit}
@@ -127,7 +127,7 @@ export default function Formy({
                     <FormyCoreDynamic
                         className={className}
                         clearFieldError={clearFieldError}
-                        formAction={formAction}
+                        action={resolvedAction}
                         formRef={formRef}
                         validatorsRef={validatorsRef}
                         setValue={persist.setValue}

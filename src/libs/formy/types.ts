@@ -45,7 +45,7 @@ export interface FormyCoreProps extends Omit<
 > {
     children: ReactNode;
     clearFieldError: (name: string) => void;
-    formAction: ComponentProps<typeof Form>['action'] | undefined;
+    action: ComponentProps<typeof Form>['action'] | null;
     setValue: (name: string, value: string) => void;
     validatorsRef: RefObject<Record<string, {
         validate: (value: string) => string | null;
