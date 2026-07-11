@@ -154,9 +154,16 @@ export const handleStateChange = (
 **`LoginForm.tsx`:**
 
 ```tsx
+import { useRouter } from 'next/navigation';
 import { handleStateChange } from './handlers';
 
-<Formy id="login-form" action={signInAction} onStateChange={handleStateChange}>
+const router = useRouter();
+
+<Formy
+    id="login-form"
+    action={signInAction}
+    onStateChange={(state) => handleStateChange(state, router)}
+>
     ...
 </Formy>
 ```
@@ -311,14 +318,14 @@ export default function AppProviders({ children }) {
 
 Shadcn and Radix UI components (e.g. `Select`, `Checkbox`, `Switch`) are always Client Components — they require JavaScript for interactivity and accessibility (keyboard navigation, ARIA). They cannot be used as static RSC children.
 
-Use `useErrorsContext` to connect any custom component to Formy's error system. It gives you the current field error and `clearFieldError` — without duplicating event logic at the form level.
+Use `useFormyErrors` to connect any custom component to Formy's error system. It gives you the current field error and `clearFieldError` — without duplicating event logic at the form level.
 
 ```tsx
 // components/CountrySelect.tsx
 'use client'
 
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useErrorsActionsContext } from "@/libs/formy";
+import { useFormyErrors } from "@/libs/formy";
 import { FormyError } from "@/libs/formy";
 
 interface CountrySelectProps {
@@ -327,7 +334,7 @@ interface CountrySelectProps {
 }
 
 export function CountrySelect({ name, defaultValue }: CountrySelectProps) {
-    const { clearFieldError } = useErrorsActionsContext();
+    const { clearFieldError } = useFormyErrors(name);
 
     return (
         <div className="relative">
@@ -360,7 +367,7 @@ Drop it directly inside a `<Formy>` form — no extra wiring needed:
 </Formy>
 ```
 
-> **Note:** `useErrorsContext` must be called inside a component that is rendered within a `<Formy>` boundary. Calling it outside will throw a developer-friendly error.
+> **Note:** `useFormyErrors` must be called inside a component that is rendered within a `<Formy>` boundary. Calling it outside will throw a developer-friendly error.
 
 ---
 
@@ -376,7 +383,7 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 | `action` | `string \| ServerAction` | `undefined` | A Server Action function or a URL string for native form submission. |
 | `initialState` | `State \| null` | `null` | Initial state passed to `useActionState` before the first submission. |
 | `children` | `ReactNode \| ((state, isPending) => ReactNode)` | — | Form content. Accepts JSX or a render-prop function. Render-prop receives the raw `Awaited<State> \| null`. |
-| `onStateChange` | `(state, router) => void` | `undefined` | Client callback fired on every new Server Action state. Receives the Next.js `router` for navigation. |
+| `onStateChange` | `(state) => void` | `undefined` | Client callback fired on every new Server Action state. |
 | `clearOnSuccess` | `boolean` | `true` | When `true`, clears the store and resets the form on success. When `false`, preserves values. |
 | `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
 | `plainMode` | `boolean` | `false` | When `true`, bypasses dynamic loading of `FormyCore` and renders a plain `<form>`/`<Form>`. Ideal for forms without Server Actions. |
@@ -426,7 +433,7 @@ Wraps React 19's `useActionState`. Safely handles both Server Action functions a
 
 ---
 
-### `useErrorsContext(name)`
+### `useFormyErrors(name)`
 
 Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) with Formy's error system. Must be called inside a component rendered within a `<Formy>` boundary.
 
@@ -443,14 +450,6 @@ Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) wi
 | `registerValidator` | `fn \| undefined` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` instead. |
 
 > See [Pattern I](#pattern-i-third-party-ui-components-shadcn--radix) for a full usage example.
-
----
-
-### `useErrorsActionsContext()`
-
-A lightweight alternative to `useErrorsContext` when you only need helper methods like `clearFieldError` and do not need to read the reactive `error` state. Calling this hook does **not** trigger component re-renders when the form's error state changes.
-
-**Returns:** `{ clearFieldError, registerValidator }`
 
 ---
 

@@ -204,14 +204,14 @@ A common misconception: `'use client'` in Next.js does **not** mean "skip server
 
 `setNativeValue` restores the hidden underlying `<input>` that Radix injects into the DOM, but it does **not** trigger a re-render of the Radix component's visual state (the custom trigger button). This is expected — Radix manages its own visual state via its own React state, which is outside Formy's reach.
 
-The correct integration pattern is to wrap the Radix component in a thin `'use client'` wrapper that calls `useErrorsActionsContext()`. This gives the component direct access to `clearFieldError` without any prop-drilling, form-level event duplication, or subscribing to error state changes (which prevents unnecessary re-renders):
+The correct integration pattern is to wrap the Radix component in a thin `'use client'` wrapper that calls `useFormyErrors(name)`. This gives the component direct access to `clearFieldError` without any prop-drilling, form-level event duplication, or subscribing to error state changes (which prevents unnecessary re-renders):
 
 ```tsx
 'use client'
-import { useErrorsActionsContext } from "@/libs/formy";
+import { useFormyErrors } from "@/libs/formy";
 
 export function CountrySelect({ name }: { name: string }) {
-    const { clearFieldError } = useErrorsActionsContext();
+    const { clearFieldError } = useFormyErrors(name);
 
     return (
         <Select name={name} onValueChange={() => clearFieldError?.(name)}>
@@ -225,4 +225,4 @@ This component can then be dropped directly into any `<Formy>` form — RSC mode
 
 ---
 
-*Last updated: July 10, 2026*
+*Last updated: July 11, 2026*

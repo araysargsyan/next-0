@@ -215,11 +215,13 @@ const FormyCoreInner = ({
                     runFieldValidation(target.name, target.checked ? "true" : "false");
                 } else if (target instanceof HTMLInputElement && target.type === "radio") {
                     if (target.checked) {
+                        clearFieldError(target.name);
                         log(`[${id ?? "anonymous"}] radio changed [${target.name}]:`, target.value);
                         setValue(target.name, target.value);
                         runFieldValidation(target.name, target.value);
                     }
                 } else if (target instanceof HTMLSelectElement) {
+                    clearFieldError(target.name);
                     log(`[${id ?? "anonymous"}] select changed [${target.name}]:`, target.value);
                     setValue(target.name, target.value);
                     runFieldValidation(target.name, target.value);
