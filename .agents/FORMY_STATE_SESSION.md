@@ -224,19 +224,6 @@ Validation fires on every keystroke (real-time). No debounce is applied yet.
 
 ## 7. Current Form IDs in Use
 
-| Form | `id` prop | File |
-|:---|:---|:---|
-| Login | `login-form` | `src/components/Forms/LoginForm/index.tsx` |
-| Image Upload | `image-upload-form` | `src/components/Forms/ImageUploadForm.tsx` |
-
----
-
-*Last updated: July 8, 2026*
-
-## 6.4. Stale Error Flash on Sequential Submits (RESOLVED, July 5)
-
-**Symptom:**
-1. Submit #1 → Server Action returns a **global** error (e.g. `{ success: false, error: "Invalid credentials" }`).
 2. User edits a field, submits again → this time the error is **field-specific** (e.g. email error).
 3. On screen, for roughly a second, the **old global error re-appears**, then disappears, and only *after* that the **new field error** shows up on the email input.
 
@@ -585,4 +572,127 @@ A controlled-input wrapper component for the render-prop/controlled mode that in
 
 ---
 
-*Last updated: July 10, 2026*
+## 14. Architecture v12.0: DOM-Based Isolated Value Restoration & Zero-Store Sync (July 12, 2026)
+
+### Objective
+Simplify the DOM restoration architecture of Formy, eliminate global DOM-querying loops (`querySelectorAll`) in `FormyCore`, and completely decouple the library from external state management (Zustand).
+
+### Architectural Decisions
+
+#### 1. DOM Element Node as Local State Storage (`Symbol`)
+Instead of utilizing a heavy global store (Zustand) or context value mapping to cache user-typed values, we store the typed data directly on the physical DOM node itself using a unique `Symbol`:
+- `el[REGISTRY_KEY] = el.value` for text elements, and `.checked` status for checkboxes/radios.
+- **Why:** During Server Action executions, React reconciles and reuses the physical DOM elements (as their keys and positions remain unchanged). The properties assigned to DOM nodes in memory are preserved across transitions.
+- **Impact:** Eliminates the need for any default Zustand store under the hood. Formy is now 0-dependency.
+
+#### 2. React 19 Client-Side Ref Cloning for RSC Inputs
+To maintain inputs as React Server Components (RSC) without exposing their `ref` property directly on the server (which throws RSC serialization errors), we wrap inputs in a Client Component helper (`RestoreInputValue`) that clones the child and attaches the `ref` on the client:
+- **Why not `document.getElementById`:** Global DOM queries require generating and managing unique `id` props for every single input field, which increases boilerplate and causes ID collision bugs when duplicate forms are mounted.
+- **Implementation:**
+  ```tsx
+  export function RestoreInputValue({ children }: { children: ReactNode }) {
+      const { state } = useContext(FormyContext);
+      const inputRef = useRef<HTMLInputElement>(null);
+
+      useEffect(() => {
+          if (inputRef.current) {
+              inputRef.current.value = getInputData(inputRef.current) || "";
+          }
+      }, [state]);
+
+      // Safely clone first child element and apply client ref
+      return cloneElement(
+          Children.toArray(children)[0] as ReactElement<{ ref?: RefObject<HTMLInputElement | null> }>,
+          { ref: inputRef }
+      );
+  }
+  ```
+
+#### 3. Component-Level Self-Aware Type Restorations
+Instead of keeping a giant switch-case in `FormyCore` for restoring checkbox, radio, or select values, `RestoreInputValue` parses the `type` prop directly from the cloned React element:
+- `const inputType = child.props.type || "text";`
+- Inside `useEffect`, it restores either `.value` or `.checked` based on `inputType`, keeping the restoration logic localized and clean.
+
+#### 4. Decentralized Zustand/External Store Synchronization
+If a developer still wants to sync values with a custom store (Zustand/Redux/LocalStorage) from a Server Component form, they write a simple `'use client'` callback handler using the store's vanilla JS API (`getState`/`setState`) and pass it to `<FormyInput onChange={handleUserChange} />`.
+- **Why:** Allows developers to wire up any store without complex bridge providers or library dependencies.
+
+```typescript
+// handlers.ts — 'use client'
+import { myStore } from "@/store/myStore";
+export const handleEmailChange = (e: ChangeEvent<HTMLInputElement>) => {
+    myStore.setState({ email: e.target.value });
+};
+```
+```tsx
+// Form.tsx — Server Component (RSC)
+import { handleEmailChange } from "./handlers";
+<FormyInput name="email" onChange={handleEmailChange} />
+```
+
+---
+
+*Last updated: July 12, 2026*
+
+---
+
+## 15. Architecture v12.0 — Final Implementation (July 12, 2026, Session Resumed)
+
+### Context
+The session that planned v12.0 was interrupted before implementation. The developer implemented v12.0 independently, with several key deviations from the plan.
+
+### What Was Planned vs. What Was Built
+
+| Planned (session log §14) | Actually Implemented |
+|:---|:---|
+| `Symbol` on DOM node as value storage | `useRef<string \| null>` inside `RestoreInputValue` |
+| Single `RestoreInputValue` wrapping RSC children via `cloneElement` | `<FormyInput>` → `<DynamicInput>` → `<RestoreInputValue>` per-input |
+| `FormyCore` dynamic chunk still existed | `FormyCore` fully eliminated |
+| Dynamic import target: `FormyCore` | Dynamic import target: `RestoreInputValue` only |
+| `querySelectorAll` eliminated via `RestoreInputValue` | ✅ No `querySelectorAll` anywhere |
+| `setNativeValue` / `setNativeChecked` eliminated | ✅ Direct `el.value` / `el.checked` assignment (no React synthetic event needed since `RestoreInputValue` owns the ref) |
+
+### What Was Actually Built
+
+#### Core: `RestoreInputValue` (per-input client wrapper)
+- Wraps a plain `<input>` via `cloneElement`, attaching `ref` and replacing `onChange`
+- Stores value in `useRef<string | null>` — no Symbol, no global store
+- Restores via `useLayoutEffect([state])` — synchronous, no flash
+- Handles checkbox (`.checked`) and radio (`.checked` + `.value`) types
+
+#### `DynamicInput` (lazy loader)
+- Reads `plainMode` from `FormyModeContext`
+- In `plainMode`: renders plain `<input>` directly
+- Otherwise: dynamically loads `RestoreInputValue` with `next/dynamic`
+
+#### `FormyInput` (public API component)
+- Composes `DynamicInput` + embedded `<FormyError>`
+- `validate` prop wired to `FormyError` → `registerValidator`
+- All error props (`errorBelow`, `errorAbsolute`, `errorHelpText`, `errorParseMessage`) forwarded
+
+#### `Formy.tsx` (simplified orchestrator)
+- No `FormyCore` — `fieldset disabled` barrier lives directly in `Formy`
+- `useFormyErrorStore` → `createErrorsStore` → `useSyncExternalStore` for zero-rerender error propagation
+- `validatorsRef` + `handleLightSubmit` for client-side validation on submit
+- Three contexts: `FormyContext` (state/isPending), `FormyModeContext` (plainMode/clearOnSuccess), `ErrorsContext` (store + validators)
+
+#### Eliminated
+- `FormyCore.tsx` — gone
+- `domHelpers.ts` (`setNativeValue`, `setNativeChecked`) — gone
+- `createPersistBridge.tsx` — gone
+- `usePersistedForm.ts` — gone
+- `FormyPersistContext.tsx` — gone
+- `formStore.ts` (Zustand) — gone
+- `FormStoreProvider.tsx` — gone
+- Zustand dependency — **Formy is now 0-dependency**
+
+### Cleanup Applied (July 12, 2026)
+- Removed stray `)` on line 125 of `Formy.tsx` (leaked into JSX output)
+- Removed `onLoad: _onLoad` dead prop destructuring from `Formy.tsx`
+- Removed dead `FormyCoreProps` interface from `types.ts`
+
+### Documentation Updated (July 12, 2026)
+- `README.md` — full rewrite: removed FormStoreProvider step, updated Quick Start to `<FormyInput>`, removed Pattern H (createPersistBridge), fixed `onInput` → `onChange`, removed Zustand from requirements
+- `TECHNICAL.md` — full rewrite: replaced FormyCore/setNativeValue sections with RestoreInputValue architecture, updated SSR analysis to reflect DynamicInput scope
+
+*Last updated: July 12, 2026*

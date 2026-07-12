@@ -26,20 +26,17 @@ The community workarounds are unsatisfying:
 
 ## How It Works
 
-Formy's core architectural goal is to keep your `<input>` elements as **React Server Components (RSC)** — pure static HTML with zero JS hydration weight. The `<Formy>` orchestrator acts as the client boundary, while all children (inputs, labels, layout markup) remain server-rendered static HTML and are never compiled into the client-side JavaScript bundle.
+Formy's core architectural goal is to preserve user-typed values across Server Action roundtrips — with zero unnecessary re-renders.
 
-To achieve this, Formy intercepts the form's `onSubmit` event to **snapshot all input values** before the Server Action fires. After the action completes on error, it **imperatively restores those values directly in the DOM** — bypassing React 19's automatic `form.reset()`.
+The `<Formy>` orchestrator acts as the client boundary. Each `<FormyInput>` wraps a native `<input>` in a lightweight client component called `RestoreInputValue`, which:
 
-Formy guarantees zero unnecessary re-renders — typing in one input or receiving a server validation error *never* triggers a re-render of the parent component or sibling inputs.
+1. Attaches a `ref` to the underlying `<input>` via `cloneElement`
+2. Captures the user's typed value in a local `useRef` on every `onChange`
+3. Restores the value via `useLayoutEffect([state])` when the Server Action state changes — synchronously before the browser paints, preventing any visible flash
 
-Formy automatically optimizes its bundle footprint: controlled forms (render-prop `children`) load zero DOM restoration code, while uncontrolled RSC forms dynamically load only the necessary DOM layer. Use `plainMode` for forms that don't need Server Actions at all.
+Formy guarantees zero unnecessary re-renders — typing in one input or receiving a server validation error *never* triggers a re-render of the parent component or sibling inputs. Only the specific `<FormyError>` for the affected field re-renders.
 
-For cross-navigation persistence, Formy integrates with an optional global store (Zustand by default) via a **store-agnostic bridge** — so your store choice doesn't matter.
-
-This means:
-- Your `<input>` fields can stay in a **Server Component** (pure static HTML, zero JS hydration weight).
-- On error, the user's typed values are preserved automatically.
-- On success, the cache is cleared and the form resets cleanly.
+`RestoreInputValue` is loaded lazily via `next/dynamic`. In `plainMode`, it is bypassed entirely — ideal for forms that don't use Server Actions.
 
 > For architecture details, implementation decisions, and SSR analysis, see [Technical Documentation](./TECHNICAL.md).
 
@@ -71,46 +68,22 @@ export async function signInAction(
 }
 ```
 
-### 2. Set up the Store Provider (once, in `layout.tsx`)
+### 2. Build the Form
 
-```tsx
-// app/layout.tsx
-import { ReactNode } from 'react';
-import FormStoreProvider from '@/components/Providers/FormStoreProvider';
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-    return (
-        <html>
-            <body>
-                <FormStoreProvider>
-                    {children}
-                </FormStoreProvider>
-            </body>
-        </html>
-    );
-}
-```
-
-### 3. Build the Form
+No global store setup. No providers. Just import and use.
 
 ```tsx
 // components/LoginForm.tsx
-import Formy, { FormyError, FormySubmit } from '@/libs/formy';
+import Formy, { FormyInput, FormyError, FormySubmit } from '@/libs/formy';
 import { signInAction } from '@/app/sign-in/actions';
 
 export default function LoginForm() {
     return (
         <Formy id="login-form" action={signInAction} className="flex flex-col gap-4">
 
-            <div className="relative">
-                <input name="email" type="email" placeholder="Email" required />
-                <FormyError field="email" below />
-            </div>
+            <FormyInput name="email" type="email" placeholder="Email" required />
 
-            <div className="relative">
-                <input name="password" type="password" placeholder="Password" required />
-                <FormyError field="password" below />
-            </div>
+            <FormyInput name="password" type="password" placeholder="Password" required />
 
             <div className="relative">
                 <FormyError />
@@ -124,6 +97,8 @@ export default function LoginForm() {
 
 That's it. On validation error, the user's values are preserved. On success, the form resets cleanly.
 
+> **Note:** Use `<FormyInput>` instead of a plain `<input>` to get automatic value restoration. A plain `<input>` inside `<Formy>` still submits correctly but its value will be wiped after an error — since there is no `ref` to capture and restore it.
+
 ---
 
 ## Usage Patterns
@@ -132,7 +107,7 @@ That's it. On validation error, the user's values are preserved. On success, the
 
 Use `onStateChange` to run client-side logic (redirect, `localStorage`, etc.) when the Server Action returns.
 
-**`handlers.tsx`** — a separate Client Reference file:
+**`handlers.ts`** — a separate Client Reference file:
 
 ```tsx
 'use client'
@@ -170,7 +145,7 @@ const router = useRouter();
 
 ### Pattern B: Render-prop Children (Controlled Mode)
 
-Pass a function as `children` to access action `state` and `isPending` directly. For controlled mode, use `<FormyInput>` to get automatic error clearing and client-side validation support:
+Pass a function as `children` to access action `state` and `isPending` directly. Use `<FormyInput>` for automatic error clearing and client-side validation:
 
 ```tsx
 import Formy, { FormyInput, FormySubmit } from '@/libs/formy';
@@ -182,7 +157,7 @@ import Formy, { FormyInput, FormySubmit } from '@/libs/formy';
                 name="username"
                 type="text"
                 value={username}
-                onInput={(e) => setUsername(e.currentTarget.value)}
+                onChange={(e) => setUsername(e.currentTarget.value)}
                 validate={(val) => val ? null : "Username is required"}
             />
             {isPending && <p>Submitting...</p>}
@@ -193,7 +168,7 @@ import Formy, { FormyInput, FormySubmit } from '@/libs/formy';
 </Formy>
 ```
 
-> **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`), not merged with client errors. `<FormyInput>` handles client error display internally.
+> **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`). `<FormyInput>` handles client error display internally via its embedded `<FormyError>`.
 
 ### Pattern C: Field-specific vs. Global Errors
 
@@ -203,7 +178,7 @@ Your Server Action can return either a single string error or a field-keyed obje
 // Global error — displayed by <FormyError /> (no `field` prop)
 return { error: 'Something went wrong.' };
 
-// Field-specific errors — each displayed by matching <FormyError field="..." />
+// Field-specific errors — each displayed by matching <FormyInput name="..." />
 return {
     error: {
         email: 'This email is not registered.',
@@ -216,7 +191,7 @@ return {
 
 ```tsx
 <Formy action={subscribeAction}>
-    <input name="email" type="email" required />
+    <FormyInput name="email" type="email" placeholder="Your email" required />
     <FormySuccess>
         <p>You are subscribed!</p>
     </FormySuccess>
@@ -226,7 +201,7 @@ return {
 
 ### Pattern E: Client-side Validation
 
-Use the `validate` prop on `<FormyError>` for real-time field validation. Validation runs on every keystroke and on submit. If client errors exist at submit time, the Server Action is **not called**.
+Use the `validate` prop on `<FormyInput>` for real-time field validation. Validation runs on every keystroke and on submit. If client errors exist at submit time, the Server Action is **not called**.
 
 > **Important:** `validate` functions must be defined in a `'use client'` module. They **cannot** be passed as props from a Server Component — Next.js will throw `"Functions cannot be passed directly to Client Components"`. Define them in a separate `validators.ts` (with `'use client'`) or inside the Client Component that renders the form.
 
@@ -252,26 +227,26 @@ export const validatePassword = (val: string) => {
 'use client'
 import { validateEmail, validatePassword } from './validators';
 
-<FormyError field="email" below validate={validateEmail} />
-<FormyError field="password" below validate={validatePassword} />
+<FormyInput name="email" type="email" validate={validateEmail} />
+<FormyInput name="password" type="password" validate={validatePassword} />
 ```
 
 ### Pattern F: Checkbox & Radio Support
 
-Checkboxes and radios are fully supported. Formy restores their checked state after errors.
+Checkboxes and radios are fully supported via `<FormyInput>`. Formy restores their checked state after errors.
 
 ```tsx
-<input type="checkbox" name="remember" />
-<input type="radio" name="role" value="admin" />
-<input type="radio" name="role" value="user" />
+<FormyInput type="checkbox" name="remember" />
+<FormyInput type="radio" name="role" value="admin" />
+<FormyInput type="radio" name="role" value="user" />
 ```
 
-**How unchecked checkboxes are handled:** The browser's `FormData` does not include unchecked checkboxes. Formy patches this by explicitly appending `"false"` for any checkbox not present in `FormData` after submission — so unchecked state is reliably restored on error.
+`RestoreInputValue` handles the `onChange` event for checkboxes (`.checked`) and radios (`.checked` + `.value`) and restores the correct state after a Server Action error.
 
 ### Pattern G: Custom Type-safe State
 
 ```tsx
-import type { FormyActionState, StrictFormyState } from '@/libs/formy';
+import type { FormyActionState } from '@/libs/formy';
 
 type MyState = FormyActionState & {
     data?: { userId: string } | null;
@@ -287,7 +262,7 @@ async function myAction(
 <Formy<MyState> action={myAction}>
     {(state) => (
         <>
-            <input name="username" />
+            <FormyInput name="username" />
             {state && 'data' in state && state.data?.userId && <p>Welcome, user {state.data.userId}!</p>}
             <FormySubmit>Submit</FormySubmit>
         </>
@@ -295,30 +270,11 @@ async function myAction(
 </Formy>
 ```
 
-### Pattern H: Custom Store (Store-agnostic Bridge)
+### Pattern H: Third-party UI Components (Shadcn / Radix)
 
-Formy is not coupled to Zustand. You can connect any store that conforms to `FormyStoreSlice`:
+Shadcn and Radix UI components (e.g. `Select`, `Checkbox`, `Switch`) are always Client Components — they require JavaScript for interactivity and accessibility (keyboard navigation, ARIA). They cannot benefit from Formy's `RestoreInputValue` restoration directly.
 
-```tsx
-import { createPersistBridge } from '@/libs/formy';
-
-// Your store hook must expose: forms, setFormValue, clearForm
-const FormyReduxBridge = createPersistBridge(useReduxFormStore);
-
-export default function AppProviders({ children }) {
-    return (
-        <FormyReduxBridge>
-            {children}
-        </FormyReduxBridge>
-    );
-}
-```
-
-### Pattern I: Third-party UI Components (Shadcn / Radix)
-
-Shadcn and Radix UI components (e.g. `Select`, `Checkbox`, `Switch`) are always Client Components — they require JavaScript for interactivity and accessibility (keyboard navigation, ARIA). They cannot be used as static RSC children.
-
-Use `useFormyErrors` to connect any custom component to Formy's error system. It gives you the current field error and `clearFieldError` — without duplicating event logic at the form level.
+Use `useFormyErrors` to connect any custom component to Formy's error system. It gives you the current field error and `clearFieldError` — without prop-drilling or form-level event duplication.
 
 ```tsx
 // components/CountrySelect.tsx
@@ -367,7 +323,7 @@ Drop it directly inside a `<Formy>` form — no extra wiring needed:
 </Formy>
 ```
 
-> **Note:** `useFormyErrors` must be called inside a component that is rendered within a `<Formy>` boundary. Calling it outside will throw a developer-friendly error.
+> **Note:** `useFormyErrors` must be called inside a component rendered within a `<Formy>` boundary. Calling it outside will throw a developer-friendly error.
 
 ---
 
@@ -379,14 +335,31 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 
 | Prop | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `id` | `string` | `undefined` | Form ID used by the global store for cross-navigation persistence. Without `id`, only local `savedValues` ref is used (lost on unmount). |
+| `id` | `string` | `undefined` | Form identifier. Currently used for logging. |
 | `action` | `string \| ServerAction` | `undefined` | A Server Action function or a URL string for native form submission. |
 | `initialState` | `State \| null` | `null` | Initial state passed to `useActionState` before the first submission. |
 | `children` | `ReactNode \| ((state, isPending) => ReactNode)` | — | Form content. Accepts JSX or a render-prop function. Render-prop receives the raw `Awaited<State> \| null`. |
 | `onStateChange` | `(state) => void` | `undefined` | Client callback fired on every new Server Action state. |
-| `clearOnSuccess` | `boolean` | `true` | When `true`, clears the store and resets the form on success. When `false`, preserves values. |
+| `clearOnSuccess` | `boolean` | `true` | When `true`, clears the saved values and resets the form on success. When `false`, preserves values. |
 | `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
-| `plainMode` | `boolean` | `false` | When `true`, bypasses dynamic loading of `FormyCore` and renders a plain `<form>`/`<Form>`. Ideal for forms without Server Actions. |
+| `plainMode` | `boolean` | `false` | When `true`, renders a plain `<form>`/`<Form>` without loading `RestoreInputValue`. Ideal for forms that don't use Server Actions. |
+
+---
+
+### `<FormyInput>` Props
+
+Extends all standard `<input>` props. Wraps the native input in `RestoreInputValue` (lazy-loaded) for automatic value restoration, and renders an embedded `<FormyError>`.
+
+| Prop | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | `string` | — | Input name. Used for form submission and error binding. |
+| `validate` | `(value: string) => string \| null` | `undefined` | Client-side validator. Must be defined in a `'use client'` module. |
+| `errorBelow` | `boolean` | `true` | Positions the embedded error below the input. |
+| `errorAbsolute` | `boolean` | `true` | Absolute positioning for the embedded error to prevent layout shifts. |
+| `errorHelpText` | `string` | `""` | Static text in the glassmorphism help tooltip. |
+| `errorParseMessage` | `(msg: string) => { title: string; info?: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. |
+| `containerClassName` | `string` | `"relative mb-6"` | CSS class for the wrapping `<div>`. |
+| `children` | `ReactNode` | `null` | Optional content rendered between the input and the error (e.g. a label). |
 
 ---
 
@@ -396,12 +369,12 @@ Renders field-specific or global error messages. Merges server errors and client
 
 | Prop | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `field` | `string` | `undefined` | Target input name. Omit for the global error. |
+| `field` | `string` | `"__global__"` | Target input name. Omit for the global error. |
 | `validate` | `(value: string) => string \| null` | `undefined` | Client-side validator. Must be defined in a `'use client'` module. |
 | `below` | `boolean` | `false` | Positions the error below the input. Default is above. |
 | `absolute` | `boolean` | `true` | Absolute positioning to prevent layout shifts. Set `false` for in-flow rendering. |
 | `helpText` | `string` | `undefined` | Static text inside the glassmorphism help tooltip. (Mutually exclusive with `parseMessage`) |
-| `parseMessage` | `(msg: string) => { title: string; info?: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. (Mutually exclusive with `helpText`, `info` is optional) |
+| `parseMessage` | `(msg: string) => { title: string; info?: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. (Mutually exclusive with `helpText`) |
 
 ---
 
@@ -433,7 +406,7 @@ Wraps React 19's `useActionState`. Safely handles both Server Action functions a
 
 ---
 
-### `useFormyErrors(name)`
+### `useFormyErrors(name?)`
 
 Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) with Formy's error system. Must be called inside a component rendered within a `<Formy>` boundary.
 
@@ -445,38 +418,12 @@ Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) wi
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `error` | `string \| null` | The current error message for this field (server or client). Automatically reactive — re-renders only when this specific field's error changes. |
-| `clearFieldError` | `(name: string) => void \| undefined` | Clears the error for the given field. Call on `onValueChange` / `onChange` to dismiss errors when the user interacts. |
-| `registerValidator` | `fn \| undefined` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` instead. |
+| `error` | `string \| null` | The current error for this field (server or client). Re-renders only when *this specific field's* error changes. |
+| `clearFieldError` | `(name: string) => void` | Clears the error for the given field. If a global error is active, it is cleared instead. |
+| `registerValidator` | `fn` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` or `<FormyInput>` instead. |
+| `runFieldValidation` | `fn` | Manually trigger validation for a field by name. |
 
-> See [Pattern I](#pattern-i-third-party-ui-components-shadcn--radix) for a full usage example.
-
----
-
-### `usePersistedForm<Store>(getState, formId)`
-
-Hook that reads and writes a single form's persisted values from any store conforming to `FormyStoreSlice`.
-
-**Returns:** `FormyPersistAdapter` — `{ getValues, setValue, clear }`
-
-> Intended to be used via `createPersistBridge` — you rarely need to call this directly.
-
----
-
-### `createPersistBridge<Store>(useGetState)`
-
-Factory that connects any store conforming to `FormyStoreSlice` to `FormyPersistContext`. Returns a `<FormyPersistBridge>` Provider component.
-
-Internally uses `usePersistedForm.bind(null, getState)` to pass a store-bound hook as the context value without an extra wrapper.
-
-**`FormyStoreSlice` contract:**
-```tsx
-interface FormyStoreSlice {
-    forms: Record<string, Record<string, string>>;
-    setFormValue: (formId: string, name: string, value: string) => void;
-    clearForm: (formId: string) => void;
-}
-```
+> See [Pattern H](#pattern-h-third-party-ui-components-shadcn--radix) for a full usage example.
 
 ---
 
@@ -497,7 +444,6 @@ type FormyActionState =
 - **Next.js** `^16.0.0`
 - **React** `^19.0.0`
 - **react-dom** `^19.0.0`
-- **zustand** `^5.0.0` (if using the default Zustand bridge)
 
 ---
 
