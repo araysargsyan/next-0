@@ -8,5 +8,7 @@ export interface FormyContextValue {
 
 export const FormyContext = createContext<FormyContextValue>({
     state: null,
-    isPending: false,
+    isPending: false
 });
+
+

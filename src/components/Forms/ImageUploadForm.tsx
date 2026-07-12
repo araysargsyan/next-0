@@ -1,4 +1,3 @@
-// import { useState, useEffect } from "react";
 import { uploadImagesAction } from "@/app/(home)/actions";
 import Formy, { FormyError, FormySubmit, FormySuccess } from "@/libs/formy";
 import { ProductNameSelect } from "./ProductNameSelect";

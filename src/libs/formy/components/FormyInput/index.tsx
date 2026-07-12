@@ -1,6 +1,6 @@
-import { FormyError } from "./FormyError";
-import type {FormyErrorProps, FormyInputProps} from "../types";
-import {DynamicInput} from "@/libs/formy/components/DynamicInput";
+import { FormyError } from "../FormyError";
+import {DynamicInput} from "./DynamicInput";
+import type {FormyErrorProps, FormyInputProps} from "../../types";
 
 
 export function FormyInput({

@@ -1,7 +1,7 @@
 "use client";
 
-import {useActionState, useState, ComponentProps} from "react";
-import {FormyAction, FormyActionState} from "../types";
+import {useActionState, useState, type ComponentProps} from "react";
+import type {FormyAction, FormyActionState} from "../types";
 import Form from "next/form";
 
 export function useFormyActionState<State extends FormyActionState = FormyActionState>(

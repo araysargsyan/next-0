@@ -1,8 +1,7 @@
 "use client";
 
-import { type ComponentProps } from "react";
+import {type ComponentProps, useLayoutEffect} from "react";
 import { useFormStatus } from "react-dom";
-import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
 import { createLogger } from "@/libs/utils/logger";
 
 const log = createLogger("FormySubmit", "blue");
@@ -14,7 +13,7 @@ interface FormySubmitProps extends ComponentProps<"button"> {
 export function FormySubmit({ loadingLabel, children, className, style, ...props }: FormySubmitProps) {
     const { pending: isPending } = useFormStatus();
 
-    useIsomorphicLayoutEffect(() => {
+    useLayoutEffect(() => {
         log(`🔄 render`, { isPending });
     });
 

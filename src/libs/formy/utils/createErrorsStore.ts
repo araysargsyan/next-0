@@ -1,4 +1,3 @@
-// utils/createErrorsStore.ts
 export interface ErrorsStore {
     getSnapshot: () => Record<string, string> | null;
     setErrors: (next: Record<string, string> | null) => void;

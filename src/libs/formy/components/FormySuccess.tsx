@@ -1,8 +1,7 @@
 "use client";
 
-import { useContext, type ReactNode } from "react";
-import { FormyContext } from "../contexts/FormyContext";
-import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
+import {type ReactNode, useLayoutEffect, useContext} from "react";
+import { FormyContext } from "../contexts";
 import { createLogger } from "@/libs/utils/logger";
 
 const log = createLogger("FormySuccess", "green");
@@ -11,7 +10,7 @@ export function FormySuccess({ children }: { children: ReactNode }) {
     const { state } = useContext(FormyContext);
     const isSuccess = !!(state && "data" in state);
 
-    useIsomorphicLayoutEffect(() => {
+    useLayoutEffect(() => {
         log(`🔄 render`, { isSuccess });
     });
 

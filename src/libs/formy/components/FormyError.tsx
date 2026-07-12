@@ -1,10 +1,9 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
-import useIsomorphicLayoutEffect from "@/hooks/useIsomorphicLayoutEffect";
+import {memo, useEffect, useLayoutEffect, useState} from "react";
+import type { FormyErrorProps } from "../types";
+import {useFormyErrors} from "../hooks";
 import { createLogger } from "@/libs/utils/logger";
-import { FormyErrorProps } from "../types";
-import {useFormyErrors} from "@/libs/formy";
 
 const log = createLogger("FormyError", "red");
 export const FormyError = memo(function FormyError({
@@ -18,7 +17,7 @@ export const FormyError = memo(function FormyError({
     const {error: stateError, registerValidator} = useFormyErrors(field);
     const [clientError, setClientError] = useState<string | null>(null);
 
-    useIsomorphicLayoutEffect(() => {
+    useLayoutEffect(() => {
         log(`[${field ?? "global"}] 🔄 render`, { clientError, stateError });
     });
 
@@ -118,7 +117,7 @@ export const FormyError = memo(function FormyError({
             }}
             className="text-rose-800 text-sm flex items-center gap-1.5"
         >
-            <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+            <div className={`w-1.5 ${error ? 'h-1.5' : ''} rounded-full bg-rose-500 shrink-0`} />
             <div className="font-medium">{titleText}</div>
             {helpIcon}
         </div>
