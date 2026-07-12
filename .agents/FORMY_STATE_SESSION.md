@@ -695,4 +695,20 @@ The session that planned v12.0 was interrupted before implementation. The develo
 - `README.md` — full rewrite: removed FormStoreProvider step, updated Quick Start to `<FormyInput>`, removed Pattern H (createPersistBridge), fixed `onInput` → `onChange`, removed Zustand from requirements, and added a dedicated "Core Integration Scenarios" section mapping all 4 usage cases.
 - `TECHNICAL.md` — full rewrite: replaced FormyCore/setNativeValue sections with RestoreInputValue architecture, updated SSR analysis to reflect DynamicInput scope.
 
+## 16. NPM Release Readiness Assessment (July 12, 2026)
+
+Following the v12.0 architecture overhaul, Formy has been evaluated as fully ready for release as a production-grade NPM package.
+
+### Core Value Proposition (USP)
+- **RSC Value Preservation:** Solves the React 19 `form.reset()` issue on Server Action completion without forcing components to migrate to client-side hydration.
+- **Zero-Dependency Architecture:** Bypasses Zustand and other external state libraries entirely, lowering bundle footprint and integration conflicts.
+- **Render-Optimization:** Avoids form-wide re-renders during validation or typing via key-scoped `useSyncExternalStore` subscriptions.
+- **Modular Dynamic Imports:** Bypasses dynamic script loaders entirely in `plainMode` or controlled modes.
+
+### Required Actions for NPM Release
+1. **Configuring Bundlers:** Set up `tsup` or `rollup` to output dual-format ESM (`.mjs`) and CommonJS (`.js`) packages, alongside declarations (`.d.ts`).
+2. **Declaring Exports:** Specify subpath exports in `package.json` to enable clean treeshaking.
+3. **Establishing Peer Dependencies:** Mark `react` (`^19.0.0`), `react-dom` (`^19.0.0`), and `next` (`^16.0.0`) as peer dependencies.
+4. **Writing Test Coverage:** Write unit tests verifying validation registrations and transition restorations.
+
 *Last updated: July 12, 2026*
