@@ -101,6 +101,170 @@ That's it. On validation error, the user's values are preserved. On success, the
 
 ---
 
+## Core Integration Scenarios
+
+Formy supports four main usage scenarios depending on your rendering strategy and third-party UI library requirements:
+
+### Scenario 1: Pure RSC Uncontrolled Mode (Default)
+- **Concept:** Both the form layout and the input elements are React Server Components (RSC) rendering static HTML.
+- **How it works:** You use the built-in `<FormyInput>` component. Formy handles DOM-level value restoration on the client dynamically after a Server Action error.
+- **Example:**
+  ```tsx
+  <Formy action={myAction}>
+      <FormyInput name="email" type="email" />
+      <FormySubmit>Submit</FormySubmit>
+  </Formy>
+  ```
+
+### Scenario 2: RSC Mode with Third-Party UI Components (Shadcn / Radix / MUI)
+- **Concept:** The parent form is an RSC, but the specific inputs are Client Components from a library (like Shadcn `<Select>` or Radix `<Checkbox>`).
+- **How it works:** Wrap the library component in a thin `'use client'` wrapper. Use `useFormyErrors` and local state/refs to persist/restore values and clear errors on interaction.
+- **Example (Text Input):**
+  ```tsx
+  // components/CustomRscInput.tsx — 'use client'
+  'use client';
+  import { useState, useContext, useLayoutEffect, useRef } from 'react';
+  import { Input as LibraryInput } from "@/components/ui/input";
+  import { FormyContext, FormyModeContext } from '@/libs/formy/contexts';
+  import { useFormyErrors, FormyError } from '@/libs/formy';
+
+  export function CustomRscInput({ name, placeholder }: { name: string; placeholder?: string }) {
+      const { state } = useContext(FormyContext);
+      const { clearOnSuccess } = useContext(FormyModeContext);
+      const { clearFieldError } = useFormyErrors(name);
+
+      const [value, setValue] = useState('');
+      const savedValue = useRef('');
+
+      useLayoutEffect(() => {
+          if (state && 'data' in state && clearOnSuccess) {
+              setValue('');
+              savedValue.current = '';
+              return;
+          }
+          if (savedValue.current && value !== savedValue.current) {
+              setValue(savedValue.current);
+          }
+      }, [state, clearOnSuccess]);
+
+      const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const val = e.target.value;
+          setValue(val);
+          savedValue.current = val;
+          clearFieldError?.(name);
+      };
+
+      return (
+          <div className="relative mb-6">
+              <LibraryInput name={name} value={value} onChange={handleChange} placeholder={placeholder} />
+              <FormyError field={name} below />
+          </div>
+      );
+  }
+  ```
+
+- **Example (Select Component):**
+  ```tsx
+  // components/CustomRscSelect.tsx — 'use client'
+  'use client';
+  import { useState, useContext, useLayoutEffect, useRef } from 'react';
+  import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+  import { FormyContext, FormyModeContext } from '@/libs/formy/contexts';
+  import { useFormyErrors, FormyError } from '@/libs/formy';
+
+  export function CustomRscSelect({ name }: { name: string }) {
+      const { state } = useContext(FormyContext);
+      const { clearOnSuccess } = useContext(FormyModeContext);
+      const { clearFieldError } = useFormyErrors(name);
+
+      const [value, setValue] = useState('');
+      const savedValue = useRef('');
+
+      useLayoutEffect(() => {
+          if (state && 'data' in state && clearOnSuccess) {
+              setValue('');
+              savedValue.current = '';
+              return;
+          }
+          if (savedValue.current && value !== savedValue.current) {
+              setValue(savedValue.current);
+          }
+      }, [state, clearOnSuccess]);
+
+      const handleChange = (newValue: string) => {
+          setValue(newValue);
+          savedValue.current = newValue;
+          clearFieldError?.(name);
+      };
+
+      return (
+          <div className="relative mb-6">
+              <Select name={name} value={value} onValueChange={handleChange}>
+                  <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="user">User</SelectItem>
+                  </SelectContent>
+              </Select>
+              <FormyError field={name} below />
+          </div>
+      );
+  }
+  ```
+
+- **Parent Form Usage (Server Component):**
+  ```tsx
+  // app/page.tsx — Server Component (RSC)
+  import Formy, { FormySubmit } from '@/libs/formy';
+  import { CustomRscInput } from '@/components/CustomRscInput';
+  import { CustomRscSelect } from '@/components/CustomRscSelect';
+  import { myAction } from './actions';
+
+  export default function Page() {
+      return (
+          <Formy action={myAction}>
+              <CustomRscInput name="email" placeholder="Email" />
+              <CustomRscSelect name="role" />
+              <FormySubmit>Save</FormySubmit>
+          </Formy>
+      );
+  }
+  ```
+
+
+### Scenario 3: Controlled / Render-prop Mode
+- **Concept:** Form state is controlled using React state (`useState`) or a custom state manager (Zustand, Redux).
+- **How it works:** Pass a function as `children` to access `state` and `isPending`. Inputs are bound controlled via `value` and `onChange`. DOM-level restoration is automatically bypassed.
+- **Example:**
+  ```tsx
+  <Formy action={submitAction}>
+      {(state, isPending) => (
+          <>
+              <FormyInput
+                  name="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+              />
+              <FormySubmit>Submit</FormySubmit>
+          </>
+      )}
+  </Formy>
+  ```
+
+### Scenario 4: Plain Mode (Bypassing Dynamic Value Restoration)
+- **Concept:** You want to render static JSX inputs (ReactNode children) instead of using a controlled render-prop function, but you do not need or want the dynamic restoration script to be downloaded (e.g., for simple search/filter forms or client-side fetch submissions where value preservation on error is not required).
+- **How it works:** Set `plainMode={true}` on `<Formy>`. This tells `<DynamicInput>` to render a plain HTML `<input>` directly. The client-side value restoration chunk (`RestoreInputValue`) is **never downloaded or loaded**, keeping the bundle size minimal while retaining client-side validation context on submit.
+- **Example:**
+  ```tsx
+  // Server or Client Component (renders static JSX, but loads 0kb value-restoration JS)
+  <Formy plainMode={true} onSubmit={handleSearch}>
+      <FormyInput name="query" placeholder="Search..." validate={notEmpty} />
+      <FormySubmit>Search</FormySubmit>
+  </Formy>
+  ```
+
+---
+
 ## Usage Patterns
 
 ### Pattern A: Client Callback on Success

@@ -692,7 +692,7 @@ The session that planned v12.0 was interrupted before implementation. The develo
 - Removed dead `FormyCoreProps` interface from `types.ts`
 
 ### Documentation Updated (July 12, 2026)
-- `README.md` — full rewrite: removed FormStoreProvider step, updated Quick Start to `<FormyInput>`, removed Pattern H (createPersistBridge), fixed `onInput` → `onChange`, removed Zustand from requirements
-- `TECHNICAL.md` — full rewrite: replaced FormyCore/setNativeValue sections with RestoreInputValue architecture, updated SSR analysis to reflect DynamicInput scope
+- `README.md` — full rewrite: removed FormStoreProvider step, updated Quick Start to `<FormyInput>`, removed Pattern H (createPersistBridge), fixed `onInput` → `onChange`, removed Zustand from requirements, and added a dedicated "Core Integration Scenarios" section mapping all 4 usage cases.
+- `TECHNICAL.md` — full rewrite: replaced FormyCore/setNativeValue sections with RestoreInputValue architecture, updated SSR analysis to reflect DynamicInput scope.
 
 *Last updated: July 12, 2026*

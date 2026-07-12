@@ -139,11 +139,11 @@ Consumed by `FormyError` and any custom component using `useFormyErrors`:
 ## 6. Plain Mode
 
 When `<Formy plainMode={true}>` is set:
-- `DynamicInput` renders a plain `<input>` — no `RestoreInputValue` chunk downloaded
-- Value restoration is skipped entirely
-- Client-side validation (`validatorsRef`) still works via `handleLightSubmit`
+- `DynamicInput` renders a plain `<input>` — no `RestoreInputValue` chunk is downloaded.
+- Value restoration is skipped entirely.
+- Client-side validation (`validatorsRef`) still works via `handleLightSubmit` on form submission.
 
-**When to use:** Forms that do not use Server Actions (search forms, client-side fetch handlers) or forms where value loss on submit is acceptable.
+**When to use:** When you want to render static JSX elements (ReactNode children) instead of writing a controlled render-prop function, but you do not need the dynamic client-side value restoration scripts (e.g. for simple search forms, filter selectors, or client-side fetch handlers where value loss on submit is acceptable).
 
 ---
 
