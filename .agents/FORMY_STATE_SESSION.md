@@ -673,7 +673,7 @@ The session that planned v12.0 was interrupted before implementation. The develo
 #### `Formy.tsx` (simplified orchestrator)
 - No `FormyCore` — `fieldset disabled` barrier lives directly in `Formy`
 - `useFormyErrorStore` → `createErrorsStore` → `useSyncExternalStore` for zero-rerender error propagation
-- `validatorsRef` + `handleLightSubmit` for client-side validation on submit
+- `validators` + `handleSubmit` for client-side validation on submit
 - Three contexts: `FormyContext` (state/isPending), `FormyModeContext` (plainMode/clearOnSuccess), `ErrorsContext` (store + validators)
 
 #### Eliminated

@@ -21,7 +21,7 @@ export function FormyInput({
         field: name,
         below: errorBelow,
         absolute: errorAbsolute,
-        validate: validate,
+        validate,
     };
     if (errorParseMessage) {
         formyErrorProps.parseMessage = errorParseMessage;

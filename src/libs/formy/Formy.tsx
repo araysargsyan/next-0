@@ -5,9 +5,10 @@ import Form from "next/form";
 import {FormyContext, ErrorsContext, FormyModeContext} from "./contexts";
 import {useFormyActionState, useFormyErrorStore} from "./hooks";
 import {runFormValidation} from "./utils/validation";
-import type {FormyProps} from "./types";
+import {FormyProps, Validators} from "./types";
 import type {SubmitEvent} from "react";
 import {createLogger} from "@/libs/utils/logger";
+import {renderChildren} from "@/libs/formy/utils/renderChildren";
 
 const log = createLogger("Formy", "magenta");
 export default function Formy({
@@ -18,7 +19,6 @@ export default function Formy({
     className = "flex flex-col gap-4 w-full max-w-sm",
     clearOnSuccess = true,
     plainMode = false,
-
     ...props
 }: FormyProps) {
     useLayoutEffect(() => {
@@ -27,16 +27,10 @@ export default function Formy({
 
     const formRef = useRef<HTMLFormElement>(null);
     const fieldsetRef = useRef<HTMLFieldSetElement>(null);
+    const validators = useRef<Validators>({});
 
     const [state, resolvedAction, isPending] = useFormyActionState(action, initialState);
     const { errorsStore, clearFieldError } = useFormyErrorStore(state, isPending);
-
-    // Client-side validation registry
-    const validatorsRef = useRef<Record<string, {
-        validate: (value: string) => string | null;
-        setError: (error: string | null) => void;
-    }>>({});
-
 
     useEffect(() => {
         log(`[${props.id ?? "anonymous"}] FormyCore loaded, enabling fieldset`);
@@ -54,13 +48,13 @@ export default function Formy({
                 validateFn: (value: string) => string | null,
                 setErrorFn: (error: string | null) => void
             ) => {
-                validatorsRef.current[name] = {validate: validateFn, setError: setErrorFn};
+                validators.current[name] = {validate: validateFn, setError: setErrorFn};
                 return () => {
-                    delete validatorsRef.current[name];
+                    delete validators.current[name];
                 };
             },
             runFieldValidation: (name: string, value: string) => {
-                const entry = validatorsRef.current[name];
+                const entry = validators.current[name];
                 if (entry) {
                     const error = entry.validate(value);
                     entry.setError(error);
@@ -70,17 +64,16 @@ export default function Formy({
         [errorsStore, clearFieldError]
     );
 
-
     useEffect(() => {
         if (onStateChange) {
             onStateChange(state);
         }
     }, [state, onStateChange]);
 
-    const handleLightSubmit = (e: SubmitEvent<HTMLFormElement>) => {
+    const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
         if (formRef.current) {
             const formData = new FormData(formRef.current);
-            const hasErrors = runFormValidation(validatorsRef.current, (name) => {
+            const hasErrors = runFormValidation(validators.current, (name) => {
                 const val = formData.get(name);
                 return typeof val === "string" ? val : "";
             });
@@ -107,18 +100,18 @@ export default function Formy({
                                     action={resolvedAction}
                                     className={className}
                                     {...props}
-                                    onSubmit={handleLightSubmit}
+                                    onSubmit={handleSubmit}
                                 >
-                                    {typeof children === "function" ? children(state, isPending) : children}
+                                    {renderChildren(children, state, isPending)}
                                 </Form>
                             ) : (
                                 <form
                                     ref={formRef}
                                     className={className}
                                     {...props}
-                                    onSubmit={handleLightSubmit}
+                                    onSubmit={handleSubmit}
                                 >
-                                    {typeof children === "function" ? children(state, isPending) : children}
+                                    {renderChildren(children, state, isPending)}
                                 </form>
                             )
                         }

@@ -9,7 +9,7 @@
 
 Formy achieves zero unnecessary re-renders via a decoupled component architecture:
 
-1. **`Formy` (Orchestrator):** Manages `useActionState`, initializes the `ErrorsStore`, and holds the `validatorsRef`. Renders a single `<fieldset disabled>` barrier that is enabled synchronously on mount via `useEffect`.
+1. **`Formy` (Orchestrator):** Manages `useActionState`, initializes the `ErrorsStore`, and holds the `validators`. Renders a single `<fieldset disabled>` barrier that is enabled synchronously on mount via `useEffect`.
 2. **`FormyInput` → `DynamicInput` → `RestoreInputValue` (DOM Layer):** Each input manages its own value snapshot and DOM restoration in isolation. `RestoreInputValue` is lazy-loaded per-input via `next/dynamic`.
 3. **`FormyError` (Local State):** Subscribes directly to an external `ErrorsStore` via `useSyncExternalStore` and handles real-time client validation locally via its own `useState`.
 
@@ -141,7 +141,7 @@ Consumed by `FormyError` and any custom component using `useFormyErrors`:
 When `<Formy plainMode={true}>` is set:
 - `DynamicInput` renders a plain `<input>` — no `RestoreInputValue` chunk is downloaded.
 - Value restoration is skipped entirely.
-- Client-side validation (`validatorsRef`) still works via `handleLightSubmit` on form submission.
+- Client-side validation (`validators`) still works via `handleSubmit` on form submission.
 
 **When to use:** When you want to render static JSX elements (ReactNode children) instead of writing a controlled render-prop function, but you do not need the dynamic client-side value restoration scripts (e.g. for simple search forms, filter selectors, or client-side fetch handlers where value loss on submit is acceptable).
 
@@ -154,7 +154,7 @@ When `children` is a function (`typeof children === "function"`), the form is in
 - `RestoreInputValue` is still loaded (to handle `onChange` → `clearFieldError` + `runFieldValidation` wiring)
 - DOM restoration via `useLayoutEffect` is effectively a no-op if the value is controlled — React re-renders with the correct state value anyway
 
-Client-side validation still works in this mode via `handleLightSubmit`.
+Client-side validation still works in this mode via `handleSubmit`.
 
 ---
 

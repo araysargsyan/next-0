@@ -1,10 +1,13 @@
 export { default } from "./Formy";
 
-// Types — public API
+// Types
 export type {FormyAction} from "./types";
 
-// Hooks — advanced usage
-export { useFormyActionState, useFormyErrors } from "./hooks";
+// Hooks
+export { useFormyErrors } from "./hooks";
+
+// Contexts
+export { FormyContext } from "./contexts"
 
 // Components
 export { FormyError, FormySubmit, FormySuccess, FormyInput } from "./components";

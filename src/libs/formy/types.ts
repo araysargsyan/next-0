@@ -1,4 +1,4 @@
-import type {ReactNode, ComponentProps, RefObject} from "react";
+import type {ReactNode, ComponentProps} from "react";
 import Form from "next/form";
 
 export type FormyActionState = { error: string | Record<string, string> | null }
@@ -18,16 +18,12 @@ export interface FormyProps<State extends FormyActionState = FormyActionState>
     plainMode?: boolean;
 }
 
-
-
-
 type FormyErrorBaseProps = {
     field?: string;
     below?: boolean;
     absolute?: boolean;
     validate?: (value: string) => string | null;
 };
-
 export type FormyErrorProps = FormyErrorBaseProps & (
     | { helpText?: string; parseMessage?: never }
     | { helpText?: never, parseMessage?: (message: string) => { title: string; info?: string } }
@@ -42,3 +38,8 @@ export interface FormyInputProps extends ComponentProps<"input"> {
     errorParseMessage?: (message: string) => { title: string; info?: string };
     containerClassName?: string;
 }
+
+export type Validators = Record<string, {
+    validate: (value: string) => string | null;
+    setError: (error: string | null) => void;
+}>
