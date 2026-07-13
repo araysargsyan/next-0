@@ -4,10 +4,7 @@ export { default } from "./Formy";
 export type {FormyAction} from "./types";
 
 // Hooks
-export { useFormyErrors } from "./hooks";
-
-// Contexts
-export { FormyContext } from "./contexts"
+export { useFormyErrors, useFormyState } from "./hooks";
 
 // Components
 export { FormyError, FormySubmit, FormySuccess, FormyInput } from "./components";
