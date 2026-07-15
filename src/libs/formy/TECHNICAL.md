@@ -1,4 +1,4 @@
-# Formy — Technical Documentation
+# formy-next — Technical Documentation
 
 > Internal architecture, implementation decisions, and performance analysis.
 > For usage guide and API reference, see [README.md](./README.md).
@@ -197,7 +197,7 @@ Use `useFormyErrors(name)` to access `clearFieldError`. Call it on `onValueChang
 
 ```tsx
 'use client'
-import { useFormyErrors } from "@/libs/formy";
+import { useFormyErrors } from "formy-next";
 
 export function CountrySelect({ name }: { name: string }) {
     const { clearFieldError } = useFormyErrors(name);

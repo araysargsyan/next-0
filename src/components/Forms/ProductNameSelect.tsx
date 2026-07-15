@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, RefObject } from "react";
 import { useFormyErrors } from "@/libs/formy";
-import { FormyError } from "@/libs/formy";
+import { FieldError } from "./FieldError";
 
 const PRODUCT_NAMES = [
     "New Product",
@@ -136,8 +136,7 @@ export function ProductNameSelect({
                     </ul>
                 )}
             </div>
-
-            <FormyError field={name} below />
+            <FieldError field={name} />
         </div>
     );
 }

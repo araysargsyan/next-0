@@ -1,4 +1,4 @@
-# Formy v7: State Management & DOM Sync — Session Cheatsheet
+# formy-next: State Management & DOM Sync — Session Cheatsheet
 
 > **Date:** July 5, 2026
 > **Scope:** Formy component ecosystem — checkbox/radio support, persist bridge, client-side validation, TypeScript cleanup, ESLint compliance, lifecycle logging, folder restructure, stale error flash fix, validator re-registration fix, file input clearing fix
@@ -560,8 +560,13 @@ A controlled-input wrapper component for the render-prop/controlled mode that in
 - [x] **Third-party UI library compatibility (Shadcn / Radix):**
   Resolved via `useErrorsContext(name)` hook — now exported as public API from `index.ts`. Custom components wrap the Radix/Shadcn element, call `clearFieldError` on `onValueChange`, and render `<FormyError>` as a sibling. Full example in `README.md` Pattern I and `TECHNICAL.md` § 9.
 
-- [ ] **Client-side validation debounce:**
-  Currently validation fires on every keystroke. For async checks (e.g. email uniqueness) a debounce mechanism is needed.
+- [x] **Client-side validation debounce:**
+  Won't Fix (by design). Debounce is the consumer's responsibility — wrap your own validate function or use a thin `'use client'` wrapper component with external state.
+
+- [ ] **Async `validate` support:**
+  Extend `validate` prop signature to `(value: string) => string | null | Promise<string | null>`.
+  Requires: race condition handling (AbortController/version counter), async submit pipeline, per-field loading state, and built-in debounce for async validators.
+  Current workaround: thin `'use client'` wrapper per async field with external state management.
 
 - [x] **File input restoration limitations (RESOLVED, July 10, 2026):**
   Removed programmatic DataTransfer file restoration from FormyCore due to security restrictions and poor cross-browser reliability. Instead, the established best practice for file inputs is to upload files immediately to temporary storage on input change, and manage cleanup across three layers:
@@ -711,4 +716,59 @@ Following the v12.0 architecture overhaul, Formy has been evaluated as fully rea
 3. **Establishing Peer Dependencies:** Mark `react` (`^19.0.0`), `react-dom` (`^19.0.0`), and `next` (`^16.0.0`) as peer dependencies.
 4. **Writing Test Coverage:** Write unit tests verifying validation registrations and transition restorations.
 
-*Last updated: July 12, 2026*
+*Last updated: July 15, 2026*
+
+---
+
+## 17. Bugs from Independent Code Review — ANALYSIS.md (July 14, 2026)
+
+Source: `src/libs/formy/ANALYSIS.md` — independent review by Claude CLI.
+
+### 17.1. Radio buttons can silently revert to a stale selection (HIGH)
+**File:** `components/FormyInput/RestoreInputValue.tsx:61-62`
+
+Each radio option is a separate component instance with its own `value` ref. Only the checked radio fires `onChange` — a deselected radio's ref keeps the old value. The restore effect fires on every `state` change and re-asserts `el.checked = el.value === value.current` per instance. Whichever DOM assignment runs last wins, which can be the stale one.
+
+**Status:** Pending.
+
+### 17.2. FormySubmit `disabled` prop overwrite (MEDIUM)
+**File:** `components/FormySubmit.tsx:26-32`
+
+`{...props}` spread after `disabled={isPending || props.disabled}` can override the computed value. If a consumer passes `disabled={false}`, the button stays clickable while pending — allowing double-submits.
+
+**Status:** Pending.
+
+### 17.3. `FormyActionState` type not exported (MEDIUM)
+**File:** `index.ts`
+
+README shows `import type { FormyActionState } from '@/libs/formy'` but `index.ts` only exports `FormyAction`, not `FormyActionState`. Following the docs produces a `TS2305` compile error.
+
+**Status:** Pending.
+
+### 17.4. `useFormyState` guard is dead code (MEDIUM)
+**File:** `hooks/useFormyState.ts:8-9` vs `contexts/FormyContext.ts:9-12`
+
+`FormyContext` has a non-null default value, so `useContext(FormyContext)` never returns falsy. The `if (!ctx) throw` in `useFormyState` can never fire. Calling the hook outside `<Formy>` silently returns defaults instead of throwing — inconsistent with `useFormyErrors` which correctly defaults to `null` and throws.
+
+**Status:** Pending.
+
+### 17.5. Minor issues (LOW)
+- `useFormyState` is exported but undocumented in README's API Reference.
+- `FormyError`'s `else if (!field)` branch is unreachable — `field` defaults to `'__global__'`, which is always truthy unless someone explicitly passes `field=""`.
+
+**Status:** Pending.
+
+---
+
+## 18. Tailwind Class Isolation (July 15, 2026)
+
+**Problem:** Formy internals contain hardcoded Tailwind CSS classes, creating a hard dependency on `@tailwindcss/postcss`. A standalone library must not assume the consumer's styling framework.
+
+**Affected files:**
+- `Formy.tsx:19` — default `className`: `"flex flex-col gap-4 w-full max-w-sm"`
+- `FormyError.tsx` — ~10 lines of hardcoded Tailwind (`text-rose-800`, `bg-rose-500`, `border-t-zinc-900`, `w-3.5 h-3.5`, etc.)
+- `FormyInput/index.tsx:14` — default `className`: `"w-full border border-gray-300 rounded-lg px-4 py-2 ..."`
+
+**Goal:** Remove all hardcoded Tailwind classes from Formy. Components should either render unstyled by default (consumer provides `className`) or use inline styles / CSS modules for minimal structural styling.
+
+**Status:** Pending design discussion.

@@ -44,7 +44,7 @@ To maintain a zero-warning IDE status and ensure clean Markdown parsing:
 ## 💬 5. Communication & Language Preferences
 
 * **Conciseness**: Keep all responses concise, structured, and focused directly on the technical task.
-* **Russian Language Support**: The user may write messages in Russian, using either Cyrillic characters or transliterated Latin (e.g., *"prodaljay"*, *"dava commit"*). Always reply in **standard Russian (Cyrillic)** to these queries, unless English is explicitly requested.
+* **Language Matching**: Always reply in the same language the user is writing in. If the user writes in English — reply in English. If the user writes in Russian (Cyrillic or transliterated Latin, e.g., *"prodaljay"*, *"dava commit"*) — reply in **standard Russian (Cyrillic)**.
 
 ---
 

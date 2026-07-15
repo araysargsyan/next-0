@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { signInAction } from "@/app/sign-in/actions";
-import Formy, { FormyError, FormySubmit, FormyInput } from "@/libs/formy";
+import Formy, { FormySubmit, FormyInput } from "@/libs/formy";
 import InfoMessage from "./InfoMessage";
 import { parsePasswordMessage } from "./handlers";
 import { validateEmail, validatePassword } from "./validators";
+import { FieldError } from "../FieldError";
 
 export const dynamic = "force-static";
 
@@ -20,37 +21,49 @@ export default function LoginForm() {
                 <InfoMessage />
             </Suspense>
 
-            <FormyInput
-                name="email"
-                type="email"
-                placeholder="Email"
-                defaultValue="bb@aa.aa"
-                validate={validateEmail}
-            />
+            <div className="relative mb-6">
+                <FormyInput
+                    name="email"
+                    type="email"
+                    placeholder="Email"
+                    defaultValue="bb@aa.aa"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <FieldError
+                    field="email"
+                    validate={validateEmail}
+                />
+            </div>
 
-            <FormyInput
-                name="password"
-                type="password"
-                placeholder="Password"
-                defaultValue="AAaa12$$"
-                errorParseMessage={parsePasswordMessage}
-                validate={validatePassword}
-            />
+            <div className="relative mb-6">
+                <FormyInput
+                    name="password"
+                    type="password"
+                    placeholder="Password"
+                    defaultValue="AAaa12$$"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <FieldError
+                    field="password"
+                    validate={validatePassword}
+                    parseMessage={parsePasswordMessage}
+                />
+            </div>
 
-            <FormyInput
-                id="remember"
-                name="remember"
-                type="checkbox"
-                containerClassName="flex items-center gap-2 mb-6"
-                className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
-            >
+            <div className="flex items-center gap-2 mb-6">
+                <FormyInput
+                    id="remember"
+                    name="remember"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+                />
                 <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer select-none">
                     Remember me
                 </label>
-            </FormyInput>
+            </div>
 
             <div className="relative">
-                <FormyError />
+                <FieldError above={true} />
                 <FormySubmit
                     loadingLabel="Signing in..."
                     className="w-full bg-black text-white rounded-lg px-4 py-2 hover:opacity-80 transition-opacity disabled:opacity-50"

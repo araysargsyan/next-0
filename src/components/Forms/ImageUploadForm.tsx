@@ -1,6 +1,7 @@
 import { uploadImagesAction } from "@/app/(home)/actions";
-import Formy, { FormyError, FormySubmit, FormySuccess } from "@/libs/formy";
+import Formy, { FormySubmit, FormySuccess } from "@/libs/formy";
 import { ProductNameSelect } from "./ProductNameSelect";
+import { FieldError } from "./FieldError";
 
 export default function ImageUploadForm() {
     /*
@@ -69,7 +70,7 @@ export default function ImageUploadForm() {
                         type="number"
                         style={{ padding: "8px", width: "100%", borderRadius: "4px", border: "1px solid #ddd" }}
                     />
-                    <FormyError field="price" below />
+                    <FieldError field="price" />
                 </div>
 
                 {/* Images Wrapper */}
@@ -85,12 +86,12 @@ export default function ImageUploadForm() {
                         accept="image/*"
                         required
                     />
-                    <FormyError field="images" below />
+                    <FieldError field="images" />
                 </div>
 
                 {/* Relative Wrapper for Global Error and Submit Button */}
                 <div className="relative">
-                    <FormyError />
+                    <FieldError above={true} />
                     <FormySubmit
                         loadingLabel="Uploading..."
                         style={{
@@ -115,3 +116,4 @@ export default function ImageUploadForm() {
         </div>
     );
 }
+

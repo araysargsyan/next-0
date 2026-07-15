@@ -1,4 +1,4 @@
-# Formy
+# formy-next
 
 > **Zero-hydration Server Action forms for Next.js 16+ and React 19.**
 > Keep your inputs on the server. Keep your data on error.
@@ -50,7 +50,7 @@ Formy guarantees zero unnecessary re-renders — typing in one input or receivin
 // app/sign-in/actions.ts
 'use server'
 
-import type { FormyActionState } from '@/libs/formy';
+import type { FormyActionState } from 'formy-next';
 
 export async function signInAction(
     _state: FormyActionState | null,
@@ -74,7 +74,7 @@ No global store setup. No providers. Just import and use.
 
 ```tsx
 // components/LoginForm.tsx
-import Formy, { FormyInput, FormyError, FormySubmit } from '@/libs/formy';
+import Formy, { FormyInput, FormyError, FormySubmit } from 'formy-next';
 import { signInAction } from '@/app/sign-in/actions';
 
 export default function LoginForm() {
@@ -110,10 +110,17 @@ Formy supports four main usage scenarios depending on your rendering strategy an
 - **How it works:** You use the built-in `<FormyInput>` component. Formy handles DOM-level value restoration on the client dynamically after a Server Action error.
 - **Example:**
   ```tsx
-  <Formy action={myAction}>
-      <FormyInput name="email" type="email" />
-      <FormySubmit>Submit</FormySubmit>
-  </Formy>
+  import Formy, { FormyInput, FormySubmit } from 'formy-next';
+  import { myAction } from './actions';
+
+  export default function MyForm() {
+      return (
+          <Formy action={myAction}>
+              <FormyInput name="email" type="email" />
+              <FormySubmit>Submit</FormySubmit>
+          </Formy>
+      );
+  }
   ```
 
 ### Scenario 2: RSC Mode with Third-Party UI Components (Shadcn / Radix / MUI)
@@ -125,8 +132,8 @@ Formy supports four main usage scenarios depending on your rendering strategy an
   'use client';
   import { useState, useContext, useLayoutEffect, useRef } from 'react';
   import { Input as LibraryInput } from "@/components/ui/input";
-  import { FormyContext, FormyModeContext } from '@/libs/formy/contexts';
-  import { useFormyErrors, FormyError } from '@/libs/formy';
+  import { FormyContext, FormyModeContext } from 'formy-next/contexts';
+  import { useFormyErrors, FormyError } from 'formy-next';
 
   export function CustomRscInput({ name, placeholder }: { name: string; placeholder?: string }) {
       const { state } = useContext(FormyContext);
@@ -169,8 +176,8 @@ Formy supports four main usage scenarios depending on your rendering strategy an
   'use client';
   import { useState, useContext, useLayoutEffect, useRef } from 'react';
   import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-  import { FormyContext, FormyModeContext } from '@/libs/formy/contexts';
-  import { useFormyErrors, FormyError } from '@/libs/formy';
+  import { FormyContext, FormyModeContext } from 'formy-next/contexts';
+  import { useFormyErrors, FormyError } from 'formy-next';
 
   export function CustomRscSelect({ name }: { name: string }) {
       const { state } = useContext(FormyContext);
@@ -215,7 +222,7 @@ Formy supports four main usage scenarios depending on your rendering strategy an
 - **Parent Form Usage (Server Component):**
   ```tsx
   // app/page.tsx — Server Component (RSC)
-  import Formy, { FormySubmit } from '@/libs/formy';
+  import Formy, { FormySubmit } from 'formy-next';
   import { CustomRscInput } from '@/components/CustomRscInput';
   import { CustomRscSelect } from '@/components/CustomRscSelect';
   import { myAction } from './actions';
@@ -237,18 +244,29 @@ Formy supports four main usage scenarios depending on your rendering strategy an
 - **How it works:** Pass a function as `children` to access `state` and `isPending`. Inputs are bound controlled via `value` and `onChange`. DOM-level restoration is automatically bypassed.
 - **Example:**
   ```tsx
-  <Formy action={submitAction}>
-      {(state, isPending) => (
-          <>
-              <FormyInput
-                  name="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-              />
-              <FormySubmit>Submit</FormySubmit>
-          </>
-      )}
-  </Formy>
+  'use client';
+  import { useState } from 'react';
+  import Formy, { FormyInput, FormySubmit } from 'formy-next';
+  import { submitAction } from './actions';
+
+  export default function ControlledForm() {
+      const [username, setUsername] = useState('');
+
+      return (
+          <Formy action={submitAction}>
+              {(state, isPending) => (
+                  <>
+                      <FormyInput
+                          name="username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                      />
+                      <FormySubmit>Submit</FormySubmit>
+                  </>
+              )}
+          </Formy>
+      );
+  }
   ```
 
 ### Scenario 4: Plain Mode (Bypassing Dynamic Value Restoration)
@@ -256,11 +274,17 @@ Formy supports four main usage scenarios depending on your rendering strategy an
 - **How it works:** Set `plainMode={true}` on `<Formy>`. This tells `<DynamicInput>` to render a plain HTML `<input>` directly. The client-side value restoration chunk (`RestoreInputValue`) is **never downloaded or loaded**, keeping the bundle size minimal while retaining client-side validation context on submit.
 - **Example:**
   ```tsx
-  // Server or Client Component (renders static JSX, but loads 0kb value-restoration JS)
-  <Formy plainMode={true} onSubmit={handleSearch}>
-      <FormyInput name="query" placeholder="Search..." validate={notEmpty} />
-      <FormySubmit>Search</FormySubmit>
-  </Formy>
+  import Formy, { FormyInput, FormySubmit } from 'formy-next';
+  import { handleSearch, notEmpty } from './handlers';
+
+  export default function SearchForm() {
+      return (
+          <Formy plainMode={true} onSubmit={handleSearch}>
+              <FormyInput name="query" placeholder="Search..." validate={notEmpty} />
+              <FormySubmit>Search</FormySubmit>
+          </Formy>
+      );
+  }
   ```
 
 ---
@@ -277,7 +301,7 @@ Use `onStateChange` to run client-side logic (redirect, `localStorage`, etc.) wh
 'use client'
 
 import { useRouter } from 'next/navigation';
-import type { FormyActionState } from '@/libs/formy';
+import type { FormyActionState } from 'formy-next';
 
 export const handleStateChange = (
     state: FormyActionState | null,
@@ -290,21 +314,25 @@ export const handleStateChange = (
 };
 ```
 
-**`LoginForm.tsx`:**
-
 ```tsx
 import { useRouter } from 'next/navigation';
+import Formy from 'formy-next';
 import { handleStateChange } from './handlers';
+import { signInAction } from './actions';
 
-const router = useRouter();
+export default function LoginForm() {
+    const router = useRouter();
 
-<Formy
-    id="login-form"
-    action={signInAction}
-    onStateChange={(state) => handleStateChange(state, router)}
->
-    ...
-</Formy>
+    return (
+        <Formy
+            id="login-form"
+            action={signInAction}
+            onStateChange={(state) => handleStateChange(state, router)}
+        >
+            {/* ... form fields ... */}
+        </Formy>
+    );
+}
 ```
 
 ### Pattern B: Render-prop Children (Controlled Mode)
@@ -312,24 +340,34 @@ const router = useRouter();
 Pass a function as `children` to access action `state` and `isPending` directly. Use `<FormyInput>` for automatic error clearing and client-side validation:
 
 ```tsx
-import Formy, { FormyInput, FormySubmit } from '@/libs/formy';
+'use client'
 
-<Formy action={submitAction}>
-    {(state, isPending) => (
-        <>
-            <FormyInput
-                name="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.currentTarget.value)}
-                validate={(val) => val ? null : "Username is required"}
-            />
-            {isPending && <p>Submitting...</p>}
-            {state && 'data' in state && <p>Done!</p>}
-            <FormySubmit>Submit</FormySubmit>
-        </>
-    )}
-</Formy>
+import { useState } from 'react';
+import Formy, { FormyInput, FormySubmit } from 'formy-next';
+import { submitAction } from './actions';
+
+export default function ControlledForm() {
+    const [username, setUsername] = useState('');
+
+    return (
+        <Formy action={submitAction}>
+            {(state, isPending) => (
+                <>
+                    <FormyInput
+                        name="username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        validate={(val) => val ? null : "Username is required"}
+                    />
+                    {isPending && <p>Submitting...</p>}
+                    {state && 'data' in state && <p>Done!</p>}
+                    <FormySubmit>Submit</FormySubmit>
+                </>
+            )}
+        </Formy>
+    );
+}
 ```
 
 > **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`). `<FormyInput>` handles client error display internally via its embedded `<FormyError>`.
@@ -354,13 +392,20 @@ return {
 ### Pattern D: Success-only Content with `FormySuccess`
 
 ```tsx
-<Formy action={subscribeAction}>
-    <FormyInput name="email" type="email" placeholder="Your email" required />
-    <FormySuccess>
-        <p>You are subscribed!</p>
-    </FormySuccess>
-    <FormySubmit>Subscribe</FormySubmit>
-</Formy>
+import Formy, { FormyInput, FormySuccess, FormySubmit } from 'formy-next';
+import { subscribeAction } from './actions';
+
+export default function SubscribeForm() {
+    return (
+        <Formy action={subscribeAction}>
+            <FormyInput name="email" type="email" placeholder="Your email" required />
+            <FormySuccess>
+                <p>You are subscribed!</p>
+            </FormySuccess>
+            <FormySubmit>Subscribe</FormySubmit>
+        </Formy>
+    );
+}
 ```
 
 ### Pattern E: Client-side Validation
@@ -389,10 +434,19 @@ export const validatePassword = (val: string) => {
 ```tsx
 // components/LoginForm/index.tsx — Client Component
 'use client'
+import Formy, { FormyInput, FormySubmit } from 'formy-next';
 import { validateEmail, validatePassword } from './validators';
+import { loginAction } from './actions';
 
-<FormyInput name="email" type="email" validate={validateEmail} />
-<FormyInput name="password" type="password" validate={validatePassword} />
+export default function LoginForm() {
+    return (
+        <Formy action={loginAction}>
+            <FormyInput name="email" type="email" validate={validateEmail} />
+            <FormyInput name="password" type="password" validate={validatePassword} />
+            <FormySubmit>Login</FormySubmit>
+        </Formy>
+    );
+}
 ```
 
 ### Pattern F: Checkbox & Radio Support
@@ -400,9 +454,19 @@ import { validateEmail, validatePassword } from './validators';
 Checkboxes and radios are fully supported via `<FormyInput>`. Formy restores their checked state after errors.
 
 ```tsx
-<FormyInput type="checkbox" name="remember" />
-<FormyInput type="radio" name="role" value="admin" />
-<FormyInput type="radio" name="role" value="user" />
+import Formy, { FormyInput, FormySubmit } from 'formy-next';
+import { registerAction } from './actions';
+
+export default function RegisterForm() {
+    return (
+        <Formy action={registerAction}>
+            <FormyInput type="checkbox" name="remember" />
+            <FormyInput type="radio" name="role" value="admin" />
+            <FormyInput type="radio" name="role" value="user" />
+            <FormySubmit>Submit</FormySubmit>
+        </Formy>
+    );
+}
 ```
 
 `RestoreInputValue` handles the `onChange` event for checkboxes (`.checked`) and radios (`.checked` + `.value`) and restores the correct state after a Server Action error.
@@ -410,28 +474,35 @@ Checkboxes and radios are fully supported via `<FormyInput>`. Formy restores the
 ### Pattern G: Custom Type-safe State
 
 ```tsx
-import type { FormyActionState } from '@/libs/formy';
+import Formy, { FormyInput, FormySubmit } from 'formy-next';
+import type { FormyActionState } from 'formy-next';
 
 type MyState = FormyActionState & {
     data?: { userId: string } | null;
 };
 
-async function myAction(
+export async function myAction(
     _state: MyState | null,
     formData: FormData
 ): Promise<MyState> {
     return { data: { userId: '123' } };
 }
 
-<Formy<MyState> action={myAction}>
-    {(state) => (
-        <>
-            <FormyInput name="username" />
-            {state && 'data' in state && state.data?.userId && <p>Welcome, user {state.data.userId}!</p>}
-            <FormySubmit>Submit</FormySubmit>
-        </>
-    )}
-</Formy>
+export default function CustomStateForm() {
+    return (
+        <Formy<MyState> action={myAction}>
+            {(state) => (
+                <>
+                    <FormyInput name="username" />
+                    {state && 'data' in state && state.data?.userId && (
+                        <p>Welcome, user {state.data.userId}!</p>
+                    )}
+                    <FormySubmit>Submit</FormySubmit>
+                </>
+            )}
+        </Formy>
+    );
+}
 ```
 
 ### Pattern H: Third-party UI Components (Shadcn / Radix)
@@ -445,8 +516,7 @@ Use `useFormyErrors` to connect any custom component to Formy's error system. It
 'use client'
 
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useFormyErrors } from "@/libs/formy";
-import { FormyError } from "@/libs/formy";
+import { useFormyErrors, FormyError } from "formy-next";
 
 interface CountrySelectProps {
     name: string;
@@ -481,10 +551,18 @@ export function CountrySelect({ name, defaultValue }: CountrySelectProps) {
 Drop it directly inside a `<Formy>` form — no extra wiring needed:
 
 ```tsx
-<Formy id="profile-form" action={profileAction}>
-    <CountrySelect name="country" />
-    <FormySubmit>Save</FormySubmit>
-</Formy>
+import Formy, { FormySubmit } from 'formy-next';
+import { CountrySelect } from './CountrySelect';
+import { profileAction } from './actions';
+
+export default function ProfileForm() {
+    return (
+        <Formy id="profile-form" action={profileAction}>
+            <CountrySelect name="country" />
+            <FormySubmit>Save</FormySubmit>
+        </Formy>
+    );
+}
 ```
 
 > **Note:** `useFormyErrors` must be called inside a component rendered within a `<Formy>` boundary. Calling it outside will throw a developer-friendly error.
@@ -591,6 +669,19 @@ Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) wi
 
 ---
 
+### `useFormyState()`
+
+Hook for accessing the current form state and pending status. Must be called inside a component rendered within a `<Formy>` boundary.
+
+**Returns:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `state` | `FormyActionState \| null` | The current action state returned by the server. |
+| `isPending` | `boolean` | Whether the form submission is currently pending. |
+
+---
+
 ### `FormyActionState` Type
 
 The base constraint for all Formy action return types.
@@ -598,7 +689,9 @@ The base constraint for all Formy action return types.
 ```tsx
 type FormyActionState =
     | { error: string | Record<string, string> | null }
-    | { data: unknown };
+    | { data: unknown }
+    | void
+    | null;
 ```
 
 ---

@@ -16,7 +16,7 @@ export default function Formy({
     initialState = null,
     children,
     onStateChange,
-    className = "flex flex-col gap-4 w-full max-w-sm",
+    className = "",
     clearOnSuccess = true,
     plainMode = false,
     ...props
