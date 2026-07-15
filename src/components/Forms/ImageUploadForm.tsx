@@ -1,5 +1,5 @@
 import { uploadImagesAction } from "@/app/(home)/actions";
-import Formy, { FormySubmit, FormySuccess } from "@/libs/formy";
+import Formy, {FormyInput, FormySubmit, FormySuccess} from "@/libs/formy";
 import { ProductNameSelect } from "./ProductNameSelect";
 import { FieldError } from "./FieldError";
 
@@ -64,7 +64,7 @@ export default function ImageUploadForm() {
                 {/* Price Wrapper */}
                 <div className="relative mb-6">
                     <label htmlFor="price" style={{ display: "block", marginBottom: "5px" }}>Price:</label>
-                    <input
+                    <FormyInput
                         id="price"
                         name="price"
                         type="number"

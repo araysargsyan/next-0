@@ -1,12 +1,12 @@
 import { createContext } from "react";
 
 export interface FormyModeContextValue {
-    plainMode?: boolean;
+    staticMode?: boolean;
     clearOnSuccess?: boolean;
 }
 
-export const FormyModeContext = createContext<FormyModeContextValue>({
-    plainMode: false,
+export const FormyModeContext = createContext<FormyModeContextValue>( {
+    staticMode: true,
     clearOnSuccess: true,
 });
 

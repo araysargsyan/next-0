@@ -27,5 +27,56 @@ This document captures the key architectural shifts and nuances of Next.js 16.2.
 - **Turbopack**: Now the default bundler for both development and production builds.
 - **React 19.2**: Stable support for View Transitions and advanced hydration fixes.
 
+## 6. React Server Components (RSC) vs Client Components
+To write efficient App Router code, understand where components execute:
+
+### React Server Components (RSC)
+- **Convention**: Default component type in Next.js (no `"use client"` directive).
+- **Execution**: Runs **exclusively on the server**.
+- **Client Bundle**: Never shipped to the browser. Zero JS footprint.
+- **Capabilities**: Can read files, query databases directly, and use `async/await` in component bodies.
+- **Limitations**: Cannot use state/effects hooks (`useState`, `useEffect`) or browser APIs.
+
+### Client Components
+- **Convention**: Marked with `"use client"` at the top of the file.
+- **Execution**: Runs **both on the server** (pre-rendered to HTML during SSR) **and in the browser** (hydrated by React).
+- **Client Bundle**: Shipped to the browser and executed during hydration.
+- **Capabilities**: Full access to state, effects, context, event handlers, and browser APIs.
+
+> **RSC Children Pattern**: Passing Server Components as `children` to Client Components preserves their RSC status. The children are serialized on the server and rendered on the client as pre-built elements without executing component code in the browser.
+
+## 7. Rendering Modes: Static vs Dynamic Rendering
+Next.js determines the rendering lifecycle at the route level:
+
+### Static Rendering (Default)
+- **Concept**: Routes are rendered at **build time** (or in the background during revalidation).
+- **Caching**: The generated HTML and RSC payload are cached and served instantly via a CDN.
+- **Triggers**: Automatic unless dynamic APIs (like `cookies()`, `headers()`, or `searchParams`) or uncached data fetches are detected. Can be forced with `export const dynamic = "force-static"`.
+
+### Dynamic Rendering
+- **Concept**: Routes are rendered at **request time** on every request.
+- **Behavior**: The server generates fresh HTML and RSC payload on demand.
+- **Triggers**: Accessing cookies, headers, search parameters, or non-cached data fetches.
+
+## 8. Passing Client Functions to Server Components / Elements
+There is a common misconception that you cannot pass client functions (callbacks, event handlers) to Server Components. In React and Next.js, this is actually fully supported via two distinct patterns:
+
+### Pattern A: Server Components Rendered Inside Client Components (Conversion)
+If a component is written without the `"use client"` directive (traditionally a Server Component), but it is imported and rendered directly inside a Client Component (a file with `"use client"`), **it automatically compiles and executes as a Client Component** for that subtree.
+Because it runs on the client, you can pass any client-side functions (like `onClick`, `onChange`, or custom callbacks) to it as props without any RSC boundary errors.
+
+### Pattern B: Client-Side Cloning (RSC Children + `cloneElement`)
+A Server Component renders a component/element (like a native `<input>`) and passes it as `children` (or via any ReactNode prop) to a Client Component. 
+Since the Client Component executes in the browser during hydration, it can intercept this pre-rendered Server element and attach client-side event handlers and refs to it dynamically using `cloneElement`:
+
+```tsx
+// Inside Client Component:
+export function ClientWrapper({ children }) {
+    const handleClientEvent = () => { ... };
+    return cloneElement(children, { onChange: handleClientEvent });
+}
+```
+This pattern allows the markup to be rendered once on the server (RSC), while still receiving interactive client functions in the browser. (This is the foundation of how Formy's `<FormyInput>` receives client event handlers).
+
 ---
-*Last updated: Wednesday, June 17, 2026*
+*Last updated: July 15, 2026*

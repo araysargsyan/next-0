@@ -60,25 +60,25 @@ const RestoreInputValue = dynamic(() =>
 );
 ```
 
-**Why:** `RestoreInputValue` contains DOM manipulation logic that is only needed when the form uses a Server Action (i.e., when value restoration is needed). In `plainMode`, this chunk is never downloaded.
+**Why:** `RestoreInputValue` contains DOM manipulation logic that is only needed when the form uses a Server Action (i.e., when value restoration is needed). When `staticMode={false}`, this chunk is never downloaded.
 
 **Branching logic in `DynamicInput`:**
 
 ```tsx
-if (plainMode) {
-    return <input {...props} />;
+if (!staticMode) {
+    return children;
 }
 return (
-    <RestoreInputValue type={props.type} onChange={props.onChange}>
-        <input {...props} />
+    <RestoreInputValue type={type} onChange={onChange}>
+        {children}
     </RestoreInputValue>
 );
 ```
 
-- **`plainMode = false` (default):** `RestoreInputValue` is dynamically loaded and wraps the input.
-- **`plainMode = true`:** Plain `<input>` rendered directly — zero dynamic chunk loading.
+- **`staticMode = true` (default):** `RestoreInputValue` is dynamically loaded and wraps the server-rendered `<input>` (passed as `children`).
+- **`staticMode = false`:** The server-rendered `<input>` is returned directly — zero dynamic chunk loading.
 
-`plainMode` is consumed from `FormyModeContext`, which is set by `<Formy plainMode={...}>`.
+`staticMode` is consumed from `FormyModeContext`, which is set by `<Formy staticMode={...}>`.
 
 ---
 
@@ -136,10 +136,10 @@ Consumed by `FormyError` and any custom component using `useFormyErrors`:
 
 ---
 
-## 6. Plain Mode
+## 6. Non-Static Mode
 
-When `<Formy plainMode={true}>` is set:
-- `DynamicInput` renders a plain `<input>` — no `RestoreInputValue` chunk is downloaded.
+When `<Formy staticMode={false}>` is set:
+- `DynamicInput` returns the server-rendered `<input>` directly — no `RestoreInputValue` chunk is downloaded.
 - Value restoration is skipped entirely.
 - Client-side validation (`validators`) still works via `handleSubmit` on form submission.
 

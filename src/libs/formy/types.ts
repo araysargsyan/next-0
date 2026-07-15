@@ -1,4 +1,4 @@
-import type {ReactNode, ComponentProps, CSSProperties} from "react";
+import type {ReactNode, ComponentProps, CSSProperties, RefAttributes, ReactElement, InputHTMLAttributes} from "react";
 import Form from "next/form";
 
 export type FormyActionState = { error: string | Record<string, string> | null }
@@ -15,7 +15,7 @@ export interface FormyProps<State extends FormyActionState = FormyActionState>
     children?: ReactNode | ((state: Awaited<State>, isPending: boolean) => ReactNode);
     onStateChange?: (state: Awaited<State>) => void;
     clearOnSuccess?: boolean;
-    plainMode?: boolean;
+    staticMode?: boolean;
 }
 
 type FormyErrorBaseProps = {
@@ -36,3 +36,12 @@ export type Validators = Record<string, {
     validate: (value: string) => string | null;
     setError: (error: string | null) => void;
 }>
+
+export interface DynamicInputProps {
+    children: ReactElement<
+        InputHTMLAttributes<HTMLInputElement> & RefAttributes<HTMLInputElement>,
+        'input'
+    >,
+    type: ComponentProps<"input">['type'],
+    onChange: ComponentProps<"input">['onChange'],
+}

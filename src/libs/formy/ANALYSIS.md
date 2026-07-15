@@ -19,7 +19,7 @@ A zero-dependency form library built specifically for Next.js 16 / React 19 Serv
 ```
 Formy (orchestrator, "use client")        useActionState + <fieldset disabled> mount barrier
  ├─ FormyContext                          {state, isPending} — plain React context
- ├─ FormyModeContext                      {plainMode, clearOnSuccess}
+ ├─ FormyModeContext                      {staticMode, clearOnSuccess}
  ├─ ErrorsContext                         external pub/sub store (createErrorsStore)
  │
  ├─ FormyInput (server-renderable) → DynamicInput ("use client") → RestoreInputValue (lazy, "use client")
@@ -109,7 +109,7 @@ but `index.ts` only re-exports `FormyAction`, not `FormyActionState`. Following 
 
 So in default mode, every `<FormyInput>` still has live client JS behind it. What Formy actually avoids is turning the **whole form** into one client component with `useState` per field. Instead of one big client bundle for the entire form, you get small, per-input client components, and the heaviest one (`RestoreInputValue`) is code-split via `next/dynamic` rather than inlined into the main bundle. That's "less JS on the critical path and better composition," not "no JS."
 
-**The one place the claim is literally true: `plainMode={true}`.** There, `DynamicInput` renders a bare `<input>` and `RestoreInputValue` is never imported — for that input, there is genuinely no restoration JS shipped or executed, just the static element plus the (unavoidable) `FormyError` client component for error display.
+**The one place the claim is literally true: `staticMode={false}`.** There, `DynamicInput` returns the server-rendered `<input>` directly and `RestoreInputValue` is never imported — for that input, there is genuinely no restoration JS shipped or executed, just the static element plus the (unavoidable) `FormyError` client component for error display.
 
 ### 4.2 "Does this approach save real MB?"
 
@@ -118,9 +118,9 @@ So in default mode, every `<FormyInput>` still has live client JS behind it. Wha
 - No `react-hook-form` / `formik` in `package.json` — this was built from scratch to avoid that class of dependency, not to trim an existing one.
 - The actual client-side surface area is small: `RestoreInputValue` is 2.6KB source, `FormyError` 4.5KB, `Formy.tsx` 4.5KB — a few KB total pre-minification, realistically under 1–2KB gzipped combined. That's the entire cost being avoided versus pulling in a full form-management library with its own subscribe/watch engine and resolver adapters.
 - In **default mode**, nothing is truly removed from total bytes transferred — `next/dynamic` code-splits `RestoreInputValue` into its own chunk that's preloaded and fetched in parallel with the main bundle. That's a load-order / TTI win (form becomes interactive sooner, no main-bundle bloat), **not** a reduction in total KB downloaded.
-- In **`plainMode`**, the saving is real and literal: that chunk is never requested, so those bytes are actually never sent — not just deferred.
+- In **`staticMode={false}`**, the saving is real and literal: that chunk is never requested, so those bytes are actually never sent — not just deferred.
 
-**Bottom line:** Formy's real win is avoiding a heavier form-management library and avoiding one monolithic client-rendered form tree. Bundle-size savings are real but small in absolute terms, and only become "zero client JS for restoration" when explicitly opting into `plainMode`.
+**Bottom line:** Formy's real win is avoiding a heavier form-management library and avoiding one monolithic client-rendered form tree. Bundle-size savings are real but small in absolute terms, and only become "zero client JS for restoration" when explicitly opting into `staticMode={false}`.
 
 ---
 
@@ -140,7 +140,7 @@ No npm package solves it the way Formy does, but several sit in the same space:
 | **`next-safe-action`, `zsa`** | Type-safe wrappers/validation pipelines around Server Actions | Don't address value preservation at all — typically paired *with* react-hook-form for the client-side piece |
 | **`@tanstack/react-form`** | Controlled-state form library with server-function adapters | Same category as RHF — solves it by not being uncontrolled, not by restoring DOM state post-reset |
 
-The common community answer today (per Robin Wieruch's and Aurora Scharff's write-ups below) is a hand-rolled `defaultValue={actionState.payload?.get("field")}` pattern — not a library. Formy's combination of RSC-composed inputs, post-reset DOM restoration via ref, a per-field external store for zero-rerender errors, and an optional `plainMode` that skips the client chunk entirely doesn't have a direct off-the-shelf equivalent.
+The common community answer today (per Robin Wieruch's and Aurora Scharff's write-ups below) is a hand-rolled `defaultValue={actionState.payload?.get("field")}` pattern — not a library. Formy's combination of RSC-composed inputs, post-reset DOM restoration via ref, a per-field external store for zero-rerender errors, and an optional `staticMode` that skips the client chunk entirely doesn't have a direct off-the-shelf equivalent.
 
 **Sources:**
 - [Submitting a `<form>` with an `action` will clear the input values · Issue #31649 · react/react](https://github.com/react/react/issues/31649)

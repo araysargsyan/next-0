@@ -1,7 +1,7 @@
 "use client";
 
 import { FormyError } from "@/libs/formy";
-import type { CSSProperties } from "react";
+import {CSSProperties, memo} from "react";
 
 interface FieldErrorProps {
     field?: string;
@@ -17,7 +17,7 @@ interface FieldErrorProps {
     style?: CSSProperties;
 }
 
-export function FieldError({
+function FieldErrorComponent({
     field = "__global__",
     validate,
     parseMessage,
@@ -93,4 +93,6 @@ export function FieldError({
         </FormyError>
     );
 }
+
+export const FieldError = memo(FieldErrorComponent);
 

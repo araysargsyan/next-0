@@ -5,33 +5,19 @@ import {
     useRef,
     cloneElement,
     useCallback,
-    useLayoutEffect
-} from "react";
-import type {
-    ReactElement,
-    ChangeEvent,
-    InputHTMLAttributes,
-    RefAttributes,
-    ComponentProps
+    useLayoutEffect,
+    type ChangeEvent
 } from "react";
 import {FormyContext, FormyModeContext} from "../../contexts";
 import {useFormyErrors} from "../../hooks";
 import {createLogger} from "@/libs/utils/logger";
+import {DynamicInputProps} from "@/libs/formy/types";
 
-
-interface RestoreInputValueProps {
-    children: ReactElement<
-        InputHTMLAttributes<HTMLInputElement> & RefAttributes<HTMLInputElement>,
-        'input'
-    >,
-    type: ComponentProps<"input">['type'],
-    onChange: ComponentProps<"input">['onChange'],
-}
 
 const log = createLogger("RestoreInputValue", "cyan");
 export function RestoreInputValue({
     children, type, onChange
-}: RestoreInputValueProps) {
+}: DynamicInputProps) {
     const {state} = useContext(FormyContext)
     const {clearOnSuccess} = useContext(FormyModeContext)
     const value = useRef<string | null>(null)

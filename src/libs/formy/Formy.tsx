@@ -18,7 +18,7 @@ export default function Formy({
     onStateChange,
     className = "",
     clearOnSuccess = true,
-    plainMode = false,
+    staticMode = true,
     ...props
 }: FormyProps) {
     useLayoutEffect(() => {
@@ -90,7 +90,7 @@ export default function Formy({
 
     return (
         <FormyContext.Provider value={{state, isPending}}>
-            <FormyModeContext.Provider value={{plainMode, clearOnSuccess}}>
+            <FormyModeContext.Provider value={{staticMode, clearOnSuccess}}>
                 <ErrorsContext.Provider value={errorsContextValue}>
                     <fieldset ref={fieldsetRef} disabled style={{display: "contents"}}>
                         {

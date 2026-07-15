@@ -1,21 +1,14 @@
-import {DynamicInput} from "./DynamicInput";
-import type {FormyInputProps} from "../../types";
-
+import type { FormyInputProps } from "../../types";
+import { DynamicInput } from "./DynamicInput";
 
 export function FormyInput({
-    className = "",
-    name,
     type,
     onChange,
     ...props
 }: FormyInputProps) {
     return (
-        <DynamicInput
-            type={type}
-            onChange={onChange}
-            name={name}
-            className={className}
-            {...props}
-        />
+        <DynamicInput type={type} onChange={onChange}>
+            <input type={type} onChange={onChange} {...props} />
+        </DynamicInput>
     );
 }

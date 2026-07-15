@@ -7,20 +7,20 @@
 
 ## The Problem
 
-React 19 introduced a painful behavior for Server Action forms: **`form.reset()` is called automatically after every action completes** — including on validation errors.
+When building forms in Next.js 16+ (App Router) and React 19, you face a hard architectural choice between Server Components (RSC) and Client Components:
 
-This means if a user submits a login form and the server returns `{ error: "Wrong password" }`, React 19 treats the action as *successfully completed* and **wipes all input values**. The user loses their typed email and has to start over.
+1. **RSC / Static Elements (Zero Hydration)**: Keep your form markup, inputs, and layout on the server. This yields optimal bundle sizes, zero client-side JS overhead, and instant load times. However, you lose the ability to perform client-side interactivity, live field-level validation, or custom error handling without writing heavy custom boilerplate.
+2. **Client Components (`'use client'`)**: Move the entire form tree, its inputs, and styles to the client JS bundle. This enables validation, interactive states, and error handling, but completely defeats the benefits of React Server Components and bloats the page's JS weight.
 
-The community workarounds are unsatisfying:
+Furthermore, if you try to keep inputs as Server Components (uncontrolled), you hit a painful React 19 limitation: **`form.reset()` is called automatically after every Server Action completes** — even on validation errors. This wipes all user-typed values, forcing them to start over.
 
-| Approach | Downside |
-| :--- | :--- |
-| Make the whole form `'use client'` with `useState` | Entire form markup moves to the JS bundle. RSC advantages lost. |
-| Use `react-hook-form` | Requires full client hydration of all fields. Heavy bundle cost. |
-| Persist values in URL query params | Pollutes browser history. Insecure for auth forms. |
-| Use `defaultValue` + `key` reset trick | Causes full form re-mount and visual flicker. |
+### The Solution: Formy
 
-**Formy solves this elegantly** — without any of these tradeoffs.
+Formy bridges this gap. It allows you to keep your `<input>` elements as **100% Server Components (RSC)** — they are compiled to HTML on the server and require zero-JS hydration for their layouts. Yet, they retain full client-side interactive capabilities:
+
+- **Automatic Value Restoration (Post-effect)**: On validation errors, user-typed values are preserved seamlessly, bypassing React 19's automatic `form.reset()`.
+- **Zero-Rerender Client-Side Validation**: Field-level validation and error reporting without re-rendering the parent form or sibling inputs.
+- **Dynamic CSS Transitions**: Error components animate smoothly without unmounting or causing layout shifts.
 
 ---
 
@@ -28,17 +28,18 @@ The community workarounds are unsatisfying:
 
 Formy's core architectural goal is to preserve user-typed values across Server Action roundtrips — with zero unnecessary re-renders.
 
-The `<Formy>` orchestrator acts as the client boundary. Each `<FormyInput>` wraps a native `<input>` in a lightweight client component called `RestoreInputValue`, which:
+Here is the underlying mechanism:
 
-1. Attaches a `ref` to the underlying `<input>` via `cloneElement`
-2. Captures the user's typed value in a local `useRef` on every `onChange`
-3. Restores the value via `useLayoutEffect([state])` when the Server Action state changes — synchronously before the browser paints, preventing any visible flash
+1. **Server Rendering**: Each `<FormyInput>` is compiled and rendered once on the server as a native HTML `<input>` element (keeping layout and static props out of the client JS bundle).
+2. **Client-Side Interactivity Overlay**: Under the default **`staticMode={true}`**, Formy automatically intercepts the server-rendered element on the client to attach reference hooks and change listeners.
+3. **Local Value Tracking**: Formy tracks the user's typed input values using local in-memory references rather than form-wide React state, preventing typing from triggering any parent or sibling re-renders.
+4. **Post-Action Restoration**: After a Server Action completes, Formy directly restores the tracked values to the DOM elements. This happens synchronously before the browser paints (`useLayoutEffect`), eliminating any visual flickering.
 
-Formy guarantees zero unnecessary re-renders — typing in one input or receiving a server validation error *never* triggers a re-render of the parent component or sibling inputs. Only the specific `<FormyError>` for the affected field re-renders.
+By using this approach, Formy guarantees **zero unnecessary re-renders** — typing in a field or rendering a server validation error *never* triggers a re-render of the parent form or sibling inputs. Only the specific `<FormyError>` for the affected field re-renders.
 
-`RestoreInputValue` is loaded lazily via `next/dynamic`. In `plainMode`, it is bypassed entirely — ideal for forms that don't use Server Actions.
+When `staticMode={false}` is set on `<Formy>`, the dynamic value restoration logic is bypassed entirely, rendering plain HTML inputs with zero additional client-side scripting.
 
-> For architecture details, implementation decisions, and SSR analysis, see [Technical Documentation](./TECHNICAL.md).
+> For internal architecture details, implementation decisions, and SSR analysis, see [Technical Documentation](./TECHNICAL.md).
 
 ---
 
@@ -269,9 +270,9 @@ Formy supports four main usage scenarios depending on your rendering strategy an
   }
   ```
 
-### Scenario 4: Plain Mode (Bypassing Dynamic Value Restoration)
+### Scenario 4: Non-Static Mode (Bypassing Dynamic Value Restoration)
 - **Concept:** You want to render static JSX inputs (ReactNode children) instead of using a controlled render-prop function, but you do not need or want the dynamic restoration script to be downloaded (e.g., for simple search/filter forms or client-side fetch submissions where value preservation on error is not required).
-- **How it works:** Set `plainMode={true}` on `<Formy>`. This tells `<DynamicInput>` to render a plain HTML `<input>` directly. The client-side value restoration chunk (`RestoreInputValue`) is **never downloaded or loaded**, keeping the bundle size minimal while retaining client-side validation context on submit.
+- **How it works:** Set `staticMode={false}` on `<Formy>`. This tells `<DynamicInput>` to render a plain HTML `<input>` directly. The client-side value restoration chunk (`RestoreInputValue`) is **never downloaded or loaded**, keeping the bundle size minimal while retaining client-side validation context on submit.
 - **Example:**
   ```tsx
   import Formy, { FormyInput, FormySubmit } from 'formy-next';
@@ -279,7 +280,7 @@ Formy supports four main usage scenarios depending on your rendering strategy an
 
   export default function SearchForm() {
       return (
-          <Formy plainMode={true} onSubmit={handleSearch}>
+          <Formy staticMode={false} onSubmit={handleSearch}>
               <FormyInput name="query" placeholder="Search..." validate={notEmpty} />
               <FormySubmit>Search</FormySubmit>
           </Formy>
@@ -584,7 +585,7 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 | `onStateChange` | `(state) => void` | `undefined` | Client callback fired on every new Server Action state. |
 | `clearOnSuccess` | `boolean` | `true` | When `true`, clears the saved values and resets the form on success. When `false`, preserves values. |
 | `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
-| `plainMode` | `boolean` | `false` | When `true`, renders a plain `<form>`/`<Form>` without loading `RestoreInputValue`. Ideal for forms that don't use Server Actions. |
+| `staticMode` | `boolean` | `true` | When `true` (default), loads `RestoreInputValue` to handle DOM-level value restoration on Server Action error. When `false`, renders plain inputs directly without dynamic loading. |
 
 ---
 
