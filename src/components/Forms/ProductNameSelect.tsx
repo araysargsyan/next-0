@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, RefObject } from "react";
-import { useFormyErrors } from "@/libs/formy";
+import { useState, useRef, useEffect, useLayoutEffect, RefObject } from "react";
+import { useFormyErrors, useFormyState } from "@/libs/formy";
 import { FieldError } from "./FieldError";
 
 const PRODUCT_NAMES = [
@@ -26,9 +26,20 @@ export function ProductNameSelect({
     label = "Product name:",
 }: ProductNameSelectProps) {
     const { clearFieldError } = useFormyErrors(name);
+    const { state } = useFormyState();
     const [isOpen, setIsOpen] = useState(false);
     const [selected, setSelected] = useState(defaultValue);
     const containerRef: RefObject<HTMLDivElement | null> = useRef(null);
+    const hiddenInputRef = useRef<HTMLInputElement>(null);
+
+    // Sync selected value with hidden input on form submission success/error
+    useLayoutEffect(() => {
+        if (state && "data" in state) {
+            setSelected(defaultValue);
+        } else if (hiddenInputRef.current) {
+            hiddenInputRef.current.value = selected;
+        }
+    }, [state, selected, defaultValue]);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -54,7 +65,7 @@ export function ProductNameSelect({
             )}
 
             {/* Hidden input carries the value into FormData */}
-            <input type="hidden" name={name} value={selected} />
+            <input ref={hiddenInputRef} type="hidden" name={name} value={selected} />
 
             {/* Custom trigger button */}
             <div ref={containerRef} style={{ position: "relative" }}>

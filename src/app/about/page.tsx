@@ -1,7 +1,7 @@
 import {protFetch} from "@/libs/auth";
-import ImageUploadForm from "@/components/Forms/ImageUploadForm";
 import { createLogger } from "@/libs/utils/logger";
 import SignOutLink from "@/components/SignOutLink";
+import ImageUploadForm from "@/components/Forms/ImageUploadForm";
 
 const log = createLogger('HomePage', 'green');
 
@@ -15,6 +15,8 @@ export default async function About() {
     return <div>
         <h1>About</h1>
         <div>Failed to load profile</div>
+        <ImageUploadForm />
+        <SignOutLink style={{ color: "red" }}>Sign out</SignOutLink>
     </div>;
   }
 

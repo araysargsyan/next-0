@@ -6,7 +6,8 @@ import {
     cloneElement,
     useCallback,
     useLayoutEffect,
-    type ChangeEvent
+    Children,
+    type ChangeEvent, isValidElement,
 } from "react";
 import {FormyContext, FormyModeContext} from "../../contexts";
 import {useFormyErrors} from "../../hooks";
@@ -15,7 +16,7 @@ import {DynamicInputProps} from "@/libs/formy/types";
 
 
 const log = createLogger("RestoreInputValue", "cyan");
-export function RestoreInputValue({
+export default function RestoreInputValue({
     children, type, onChange
 }: DynamicInputProps) {
     const {state} = useContext(FormyContext)
@@ -25,7 +26,7 @@ export function RestoreInputValue({
     const inputRef = useRef<HTMLInputElement>(null)
 
     useLayoutEffect(() => {
-        log(`🔄 RestoreInputValue render`);
+        log(`🔄 RestoreInputValue render`, inputRef.current);
     });
 
     useLayoutEffect(() => {
@@ -74,10 +75,15 @@ export function RestoreInputValue({
         onChange?.(e);
     }, [clearFieldError, onChange, runFieldValidation]);
 
+    const resolved = Children.toArray(children)[0];
+
+    if (!isValidElement<DynamicInputProps['children']['props']>(resolved)) {
+        throw new Error("RestoreInputValue: expected a single valid input element as children");
+    }
+
     // eslint-disable-next-line react-hooks/refs
-    return cloneElement(children, {
+    return cloneElement(resolved, {
         ref: inputRef,
-        onChange: handleChange
+        onChange: handleChange,
     })
 }
-

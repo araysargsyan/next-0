@@ -671,9 +671,8 @@ The session that planned v12.0 was interrupted before implementation. The develo
 - Otherwise: dynamically loads `RestoreInputValue` with `next/dynamic`
 
 #### `FormyInput` (public API component)
-- Composes `DynamicInput` + embedded `<FormyError>`
-- `validate` prop wired to `FormyError` → `registerValidator`
-- All error props (`errorBelow`, `errorAbsolute`, `errorHelpText`, `errorParseMessage`) forwarded
+- Composes `DynamicInput` wrapper around standard `<input>`.
+- Renders only the input element and restoration wrapper, keeping it completely decoupled from error markup or layout styling.
 
 #### `Formy.tsx` (simplified orchestrator)
 - No `FormyCore` — `fieldset disabled` barrier lives directly in `Formy`
@@ -771,4 +770,84 @@ README shows `import type { FormyActionState } from '@/libs/formy'` but `index.t
 
 **Goal:** Remove all hardcoded Tailwind classes from Formy. Components should either render unstyled by default (consumer provides `className`) or use inline styles / CSS modules for minimal structural styling.
 
-**Status:** Pending design discussion.
+**Status:** ✅ RESOLVED (July 15, 2026). All default `className` values in `Formy.tsx`, `FormyError.tsx`, and `FormyInput/index.tsx` now default to `""`. Consumers provide their own classes.
+
+---
+
+## 19. 🚨 ULTRA PRIORITY — RSC Claim vs. Reality: `cloneElement` + Turbopack Lazy Serialization (July 15, 2026)
+
+### Problem
+
+The published documentation for `formy-next` claims:
+> *"Keep your `<input>` elements as 100% Server Components (RSC)"*
+> *"Each `<FormyInput>` is compiled and rendered once on the server as a native HTML `<input>` element (keeping layout and static props out of the client JS bundle)."*
+
+This claim is **architecturally false** in the current implementation.
+
+### Root Cause
+
+To use `cloneElement(children, { ref, onChange })` in `RestoreInputValue` (a client component), the `children` prop must be a standard React element (`Symbol(react.element)`). However:
+
+- If `<input>` is created inside `FormyInput/index.tsx` (a server-renderable component, no `"use client"`) and passed as `children` across the RSC boundary to `DynamicInput` (client component), **Next.js 16 / Turbopack serializes it as `Symbol(react.lazy)`**.
+- `cloneElement` cannot clone a `Symbol(react.lazy)` object — it throws: `Element type is invalid: expected a string ... but got: undefined`.
+- Wrapping in `<Suspense>` makes `cloneElement` receive the `<Suspense>` element itself (valid, but wrong target — `ref` lands on `Suspense`, not `<input>`).
+
+**Verified:** `console.log(children)` inside `RestoreInputValue` confirmed: `{$$typeof: Symbol(react.lazy), _payload: ReactPromise, ...}` — `isValidElement()` returns `false`.
+
+### Current Workaround (Active)
+
+`<input>` is created **inside `DynamicInput`** (a `"use client"` component) so it is always a plain `Symbol(react.element)` on the client. `FormyInput/index.tsx` is a thin pass-through that just routes props to `DynamicInput`.
+
+**What this means:** The `<input>` is NOT an RSC. Its props (`className`, `placeholder`, `defaultValue`, etc.) are serialized into the hydration payload and shipped to the browser. `DynamicInput` JS is part of the client bundle. The ANALYSIS.md §4.1 already documents this gap honestly.
+
+### What Needs to Be Resolved
+
+Choose one of the following paths before any NPM release:
+
+#### Option A — Fix the Architecture (True RSC inputs)
+Find a mechanism to attach `ref` and `onChange` to an RSC-created `<input>` **without `cloneElement`** and without `querySelector`. Requires a novel approach not yet identified.
+
+#### Option B — Update the Documentation to Match Reality
+Rewrite the marketing claims to accurately describe what Formy actually does:
+- ✅ **True:** Avoids monolithic client form tree; `RestoreInputValue` is code-split per-input.
+- ✅ **True:** Zero unnecessary re-renders via `useSyncExternalStore`.
+- ✅ **True:** `staticMode={false}` genuinely yields zero restoration JS.
+- ❌ **False:** "100% Server Components" / "zero-JS hydration" for inputs in `staticMode={true}`.
+
+**Status:** 🔴 Pending — decision and implementation required before NPM release.
+
+---
+
+## Current TODO List (as of July 15, 2026)
+
+### 🚨 Ultra Priority
+
+- [ ] **19. RSC claim vs. reality — architecture decision required:**
+  `<input>` created in `DynamicInput` (client), not in RSC. `cloneElement` breaks when `<input>` crosses RSC→client boundary as `Symbol(react.lazy)`. Must choose: fix architecture (true RSC inputs without `cloneElement`) OR update documentation to reflect what Formy actually does. **Blocker for NPM release.**
+
+### 🔴 High Priority
+
+- [ ] **17.1. Radio buttons can silently revert to a stale selection:**
+  Each radio instance has its own `value` ref. The restore `useLayoutEffect` fires on every `state` change and re-asserts `el.checked = el.value === value.current`. DOM assignment order determines winner — can silently restore stale selection.
+
+### 🟡 Medium Priority
+
+- [ ] **17.2. `FormySubmit` `disabled` prop overwrite:**
+  `{...props}` spread after `disabled={isPending || props.disabled}` overwrites computed value. Consumer passing `disabled={false}` allows double-submits while pending.
+
+- [ ] **17.3. `FormyActionState` type not exported:**
+  `index.ts` exports `FormyAction` but not `FormyActionState`. README examples produce `TS2305` compile error.
+
+- [ ] **17.4. `useFormyState` guard is dead code:**
+  `FormyContext` has non-null default; `if (!ctx) throw` can never fire. Silently returns defaults outside `<Formy>` instead of throwing, unlike `useFormyErrors`.
+
+### 🟢 Low Priority / Future
+
+- [ ] **Async `validate` support:**
+  Extend `validate` prop to `(value: string) => string | null | Promise<string | null>`. Requires AbortController, async submit pipeline, per-field loading state, built-in debounce.
+
+- [ ] **17.5. Minor issues:**
+  - `useFormyState` exported but undocumented in README API Reference.
+  - `FormyError`'s `else if (!field)` branch is unreachable (`field` defaults to `'__global__'`).
+
+*Last updated: July 15, 2026*

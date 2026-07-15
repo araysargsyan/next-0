@@ -8,7 +8,7 @@ export function FormyInput({
 }: FormyInputProps) {
     return (
         <DynamicInput type={type} onChange={onChange}>
-            <input type={type} onChange={onChange} {...props} />
+            <input type={type} {...props} />
         </DynamicInput>
     );
 }

@@ -1,12 +1,12 @@
 "use client"
 
-import { useContext } from "react";
-import { FormyModeContext } from "../../contexts";
+import {Suspense, useContext} from "react";
 import dynamic from "next/dynamic";
-import {DynamicInputProps} from "@/libs/formy/types";
+import { FormyModeContext } from "../../contexts";
+import type {DynamicInputProps} from "../../types";
+import until from "@/libs/utils/until";
 
-const RestoreInputValue = dynamic(() =>
-    import("./RestoreInputValue").then(m => ({ default: m.RestoreInputValue }))
+const RestoreInputValue = dynamic(() => until(3000).then(()=>import("./RestoreInputValue"))
 );
 
 export function DynamicInput({ children, type, onChange }: DynamicInputProps) {
@@ -17,8 +17,10 @@ export function DynamicInput({ children, type, onChange }: DynamicInputProps) {
     }
 
     return (
-        <RestoreInputValue type={type} onChange={onChange}>
-            {children}
-        </RestoreInputValue>
+        <Suspense fallback={children}>
+            <RestoreInputValue type={type} onChange={onChange}>
+                {children}
+            </RestoreInputValue>
+        </Suspense>
     );
 }

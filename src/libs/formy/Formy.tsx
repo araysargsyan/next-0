@@ -33,7 +33,7 @@ export default function Formy({
     const { errorsStore, clearFieldError } = useFormyErrorStore(state, isPending);
 
     useEffect(() => {
-        log(`[${props.id ?? "anonymous"}] FormyCore loaded, enabling fieldset`);
+        log(`[${props.id ?? "anonymous"}] Formy loaded, enabling fieldset`);
         if (fieldsetRef.current) {
             fieldsetRef.current.disabled = false;
         }

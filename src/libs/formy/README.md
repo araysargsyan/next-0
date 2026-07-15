@@ -281,7 +281,8 @@ Formy supports four main usage scenarios depending on your rendering strategy an
   export default function SearchForm() {
       return (
           <Formy staticMode={false} onSubmit={handleSearch}>
-              <FormyInput name="query" placeholder="Search..." validate={notEmpty} />
+              <FormyInput name="query" placeholder="Search..." />
+              <FormyError field="query" validate={notEmpty} />
               <FormySubmit>Search</FormySubmit>
           </Formy>
       );
@@ -338,13 +339,13 @@ export default function LoginForm() {
 
 ### Pattern B: Render-prop Children (Controlled Mode)
 
-Pass a function as `children` to access action `state` and `isPending` directly. Use `<FormyInput>` for automatic error clearing and client-side validation:
+Pass a function as `children` to access action `state` and `isPending` directly. Use `<FormyInput>` for automatic value restoration, and `<FormyError>` for client-side validation:
 
 ```tsx
 'use client'
 
 import { useState } from 'react';
-import Formy, { FormyInput, FormySubmit } from 'formy-next';
+import Formy, { FormyInput, FormyError, FormySubmit } from 'formy-next';
 import { submitAction } from './actions';
 
 export default function ControlledForm() {
@@ -359,6 +360,9 @@ export default function ControlledForm() {
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
+                    />
+                    <FormyError
+                        field="username"
                         validate={(val) => val ? null : "Username is required"}
                     />
                     {isPending && <p>Submitting...</p>}
@@ -371,7 +375,7 @@ export default function ControlledForm() {
 }
 ```
 
-> **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`). `<FormyInput>` handles client error display internally via its embedded `<FormyError>`.
+> **Note:** The `state` received by render-prop children is the raw Server Action state (`Awaited<State> | null`). Use `<FormyError>` to display and manage field-specific errors.
 
 ### Pattern C: Field-specific vs. Global Errors
 
@@ -411,7 +415,7 @@ export default function SubscribeForm() {
 
 ### Pattern E: Client-side Validation
 
-Use the `validate` prop on `<FormyInput>` for real-time field validation. Validation runs on every keystroke and on submit. If client errors exist at submit time, the Server Action is **not called**.
+Use the `validate` prop on `<FormyError>` for real-time field validation. Validation runs on every keystroke and on submit. If client errors exist at submit time, the Server Action is **not called**.
 
 > **Important:** `validate` functions must be defined in a `'use client'` module. They **cannot** be passed as props from a Server Component — Next.js will throw `"Functions cannot be passed directly to Client Components"`. Define them in a separate `validators.ts` (with `'use client'`) or inside the Client Component that renders the form.
 
@@ -435,15 +439,17 @@ export const validatePassword = (val: string) => {
 ```tsx
 // components/LoginForm/index.tsx — Client Component
 'use client'
-import Formy, { FormyInput, FormySubmit } from 'formy-next';
+import Formy, { FormyInput, FormyError, FormySubmit } from 'formy-next';
 import { validateEmail, validatePassword } from './validators';
 import { loginAction } from './actions';
 
 export default function LoginForm() {
     return (
         <Formy action={loginAction}>
-            <FormyInput name="email" type="email" validate={validateEmail} />
-            <FormyInput name="password" type="password" validate={validatePassword} />
+            <FormyInput name="email" type="email" />
+            <FormyError field="email" validate={validateEmail} />
+            <FormyInput name="password" type="password" />
+            <FormyError field="password" validate={validatePassword} />
             <FormySubmit>Login</FormySubmit>
         </Formy>
     );
@@ -591,18 +597,7 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 
 ### `<FormyInput>` Props
 
-Extends all standard `<input>` props. Wraps the native input in `RestoreInputValue` (lazy-loaded) for automatic value restoration, and renders an embedded `<FormyError>`.
-
-| Prop | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `name` | `string` | — | Input name. Used for form submission and error binding. |
-| `validate` | `(value: string) => string \| null` | `undefined` | Client-side validator. Must be defined in a `'use client'` module. |
-| `errorBelow` | `boolean` | `true` | Positions the embedded error below the input. |
-| `errorAbsolute` | `boolean` | `true` | Absolute positioning for the embedded error to prevent layout shifts. |
-| `errorHelpText` | `string` | `""` | Static text in the glassmorphism help tooltip. |
-| `errorParseMessage` | `(msg: string) => { title: string; info?: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. |
-| `containerClassName` | `string` | `"relative mb-6"` | CSS class for the wrapping `<div>`. |
-| `children` | `ReactNode` | `null` | Optional content rendered between the input and the error (e.g. a label). |
+Extends all standard `<input>` props. Wraps the native input in `RestoreInputValue` (lazy-loaded) for automatic value restoration.
 
 ---
 
@@ -663,7 +658,7 @@ Hook for integrating custom or third-party UI components (e.g. Shadcn, Radix) wi
 | :--- | :--- | :--- |
 | `error` | `string \| null` | The current error for this field (server or client). Re-renders only when *this specific field's* error changes. |
 | `clearFieldError` | `(name: string) => void` | Clears the error for the given field. If a global error is active, it is cleared instead. |
-| `registerValidator` | `fn` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` or `<FormyInput>` instead. |
+| `registerValidator` | `fn` | Low-level validator registration. Prefer the `validate` prop on `<FormyError>` instead. |
 | `runFieldValidation` | `fn` | Manually trigger validation for a field by name. |
 
 > See [Pattern H](#pattern-h-third-party-ui-components-shadcn--radix) for a full usage example.
