@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
     useContext,
@@ -7,23 +7,24 @@ import {
     useCallback,
     useLayoutEffect,
     Children,
-    type ChangeEvent, isValidElement,
+    type ChangeEvent,
+    isValidElement,
 } from "react";
-import {FormyContext, FormyModeContext} from "../../contexts";
-import {useFormyErrors} from "../../hooks";
-import {createLogger} from "@/libs/utils/logger";
-import {DynamicInputProps} from "@/libs/formy/types";
-
+import { FormyContext, FormyModeContext } from "../../contexts";
+import { useFormyErrors } from "../../hooks";
+import { createLogger } from "@/libs/utils/logger";
+import { DynamicInputProps } from "../../types";
 
 const log = createLogger("RestoreInputValue", "cyan");
+
 export default function RestoreInputValue({
     children, type, onChange
 }: DynamicInputProps) {
-    const {state} = useContext(FormyContext)
-    const {clearOnSuccess} = useContext(FormyModeContext)
-    const value = useRef<string | null>(null)
-    const {clearFieldError, runFieldValidation} = useFormyErrors()
-    const inputRef = useRef<HTMLInputElement>(null)
+    const { state } = useContext(FormyContext);
+    const { clearOnSuccess } = useContext(FormyModeContext);
+    const value = useRef<string | null>(null);
+    const { clearFieldError, runFieldValidation } = useFormyErrors();
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useLayoutEffect(() => {
         log(`🔄 RestoreInputValue render`, inputRef.current);
@@ -32,11 +33,11 @@ export default function RestoreInputValue({
     useLayoutEffect(() => {
         const el = inputRef.current;
         if (!el) return;
-        log("restoring value", {state, value: value.current})
+        log("restoring value", { state, value: value.current });
 
         if (state && "data" in state) {
             if (clearOnSuccess) {
-                value.current = null
+                value.current = null;
                 return;
             }
         }
@@ -50,14 +51,13 @@ export default function RestoreInputValue({
         } else {
             el.value = value.current || '';
         }
-    }, [state, clearOnSuccess, type])
-
+    }, [state, clearOnSuccess, type]);
 
     const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-        log("handleChange", {value: value.current})
+        log("handleChange", { value: value.current });
         const target = e.target;
 
-        runFieldValidation(target.name, target.value)
+        runFieldValidation(target.name, target.value);
 
         if (target.type === "checkbox") {
             value.current = target.checked ? "true" : "false";
@@ -85,5 +85,5 @@ export default function RestoreInputValue({
     return cloneElement(resolved, {
         ref: inputRef,
         onChange: handleChange,
-    })
+    });
 }

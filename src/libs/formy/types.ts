@@ -1,4 +1,12 @@
-import type {ReactNode, ComponentProps, CSSProperties, RefAttributes, ReactElement, InputHTMLAttributes} from "react";
+import type {
+    ReactNode,
+    ComponentProps,
+    CSSProperties,
+    RefAttributes,
+    ReactElement,
+    InputHTMLAttributes,
+    RefObject
+} from "react";
 import Form from "next/form";
 
 export type FormyActionState = { error: string | Record<string, string> | null }
@@ -35,13 +43,34 @@ export type FormyInputProps = ComponentProps<"input">;
 export type Validators = Record<string, {
     validate: (value: string) => string | null;
     setError: (error: string | null) => void;
-}>
+}>;
+
+export type FormContentProps = Omit<FormyProps, "action" | "children"> & {
+    validators: RefObject<Validators>;
+    staticMode: boolean;
+    action: ComponentProps<typeof Form>["action"] | null;
+    children: ReactNode;
+};
+
+export type FormyRestoreEngineProps = {
+    formRef: RefObject<HTMLFormElement | null>;
+};
+
+export type FormElementProps = Omit<FormContentProps, "validators"> & {
+    formRef: RefObject<HTMLFormElement | null>;
+};
+
+export type FieldsetBarrierProps = {
+    fieldsetRef: RefObject<HTMLFieldSetElement | null>;
+    active: boolean;
+    children: ReactNode;
+};
 
 export interface DynamicInputProps {
     children: ReactElement<
         InputHTMLAttributes<HTMLInputElement> & RefAttributes<HTMLInputElement>,
         'input'
-    >,
-    type: ComponentProps<"input">['type'],
-    onChange: ComponentProps<"input">['onChange'],
+    >;
+    type: ComponentProps<"input">['type'];
+    onChange: ComponentProps<"input">['onChange'];
 }

@@ -15,13 +15,14 @@ To maintain a zero-warning IDE status and ensure clean Markdown parsing:
 
 ## 🤝 2. Collaboration & Development Alignment
 
-* **Design Alignment First**: Never write, modify, or delete code without prior discussion. Propose the architectural plan in plain text first, obtain explicit user approval, and only then proceed with code changes.
+* **Design Alignment First**: Никогда не писать, не изменять и не удалять код без предварительного обсуждения. Сначала предложить архитектурный план простым текстом, получить явное согласие пользователя, и только потом приступать к изменениям кода. Это железное правило касается ЛЮБЫХ правок: исправления багов, восстановления удаленных файлов, редактирования документации и даже мелких доработок. Сначала — согласованный текстовый план, затем — вызов инструментов.
 * **No Auto-Committing**: Automatically staging or committing changes is strictly prohibited. Execute Git operations (`git add`, `git commit`) *only* upon direct user request (e.g., *"commit"* or *"lets commit"*). Do not ask or prompt the user for commits; wait until the user explicitly issues the command.
 * **Codebase Language Integrity**: Keep the codebase 100% in English. No Russian words (Cyrillic or transliterated Latin-Russian) are permitted in code, comments, log messages, documentation, or configuration files.
 * **Exhaustive Directory Analysis**: Whenever instructed to study, analyze, or check the `.agents` directory, the agent must read every file permitted by the **Current Scope Exclusions** rule below (e.g. `FORMY_STATE_SESSION.md`, `NEXT_16_RESOURCES.md`), not just `AGENTS.md`, to ensure full contextual alignment.
 * **Current Scope Exclusions**: The active development focus is split into two independent sessions — Formy and AuthSDK. These session files are **strictly scoped** and must never be read outside their respective context:
   * **Formy task in progress** → `AUTH_SDK_SESSION_LOG.md` **MUST NOT be opened, read, or referenced** under any circumstances. Opening it is a rule violation even as part of an `.agents` directory analysis.
   * **AuthSDK task in progress** → `FORMY_STATE_SESSION.md` **MUST NOT be opened, read, or referenced** under any circumstances.
+  * `FORMY_STATE_SESSION_OLD.md` is an **archived history file** and **MUST NOT be opened, read, or referenced** under any circumstances, regardless of the active session. It is never relevant.
   * `AGENTS.md` and `NEXT_16_RESOURCES.md` are **always required reading** regardless of the active session.
 
 ---

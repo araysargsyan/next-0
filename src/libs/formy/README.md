@@ -30,10 +30,10 @@ Formy's core architectural goal is to preserve user-typed values across Server A
 
 Here is the underlying mechanism:
 
-1. **Server Rendering**: Each `<FormyInput>` is compiled and rendered once on the server as a native HTML `<input>` element (keeping layout and static props out of the client JS bundle).
-2. **Client-Side Interactivity Overlay**: Under the default **`staticMode={true}`**, Formy automatically intercepts the server-rendered element on the client to attach reference hooks and change listeners.
-3. **Local Value Tracking**: Formy tracks the user's typed input values using local in-memory references rather than form-wide React state, preventing typing from triggering any parent or sibling re-renders.
-4. **Post-Action Restoration**: After a Server Action completes, Formy directly restores the tracked values to the DOM elements. This happens synchronously before the browser paints (`useLayoutEffect`), eliminating any visual flickering.
+1. **Server Rendering**: Each `<FormyInput>` is compiled and rendered once on the server as a native HTML `<input>` element with a `data-formy-input` attribute (keeping layout and static props out of the client JS bundle).
+2. **Client-Side Interactivity Overlay**: Under the default **`staticMode={true}`**, Formy dynamically loads the `FormyRestoreEngine` on the client, which sets up form-wide event delegation for all inputs marked with `data-formy-input`.
+3. **Local Value Tracking**: Formy tracks the user's typed input values using a form-level in-memory reference map rather than form-wide React state, preventing typing from triggering any parent or sibling re-renders.
+4. **Post-Action Restoration**: After a Server Action completes, the restoration engine directly restores the tracked values to the DOM elements. This happens synchronously before the browser paints (`useLayoutEffect`), eliminating any visual flickering.
 
 By using this approach, Formy guarantees **zero unnecessary re-renders** — typing in a field or rendering a server validation error *never* triggers a re-render of the parent form or sibling inputs. Only the specific `<FormyError>` for the affected field re-renders.
 
@@ -272,7 +272,7 @@ Formy supports four main usage scenarios depending on your rendering strategy an
 
 ### Scenario 4: Non-Static Mode (Bypassing Dynamic Value Restoration)
 - **Concept:** You want to render static JSX inputs (ReactNode children) instead of using a controlled render-prop function, but you do not need or want the dynamic restoration script to be downloaded (e.g., for simple search/filter forms or client-side fetch submissions where value preservation on error is not required).
-- **How it works:** Set `staticMode={false}` on `<Formy>`. This tells `<DynamicInput>` to render a plain HTML `<input>` directly. The client-side value restoration chunk (`RestoreInputValue`) is **never downloaded or loaded**, keeping the bundle size minimal while retaining client-side validation context on submit.
+- **How it works:** Set `staticMode={false}` on `<Formy>`. This tells the parent form wrapper to bypass the `<FieldsetBarrier>` and skip loading `FormyRestoreEngine`. The client-side value restoration chunk is **never downloaded or loaded**, keeping the bundle size minimal while retaining client-side validation context on submit.
 - **Example:**
   ```tsx
   import Formy, { FormyInput, FormySubmit } from 'formy-next';
@@ -476,7 +476,7 @@ export default function RegisterForm() {
 }
 ```
 
-`RestoreInputValue` handles the `onChange` event for checkboxes (`.checked`) and radios (`.checked` + `.value`) and restores the correct state after a Server Action error.
+`FormyRestoreEngine` handles `change` events for checkboxes and radios, caching their `.checked` state or selected values, and restores the correct state after a Server Action error.
 
 ### Pattern G: Custom Type-safe State
 
@@ -514,7 +514,7 @@ export default function CustomStateForm() {
 
 ### Pattern H: Third-party UI Components (Shadcn / Radix)
 
-Shadcn and Radix UI components (e.g. `Select`, `Checkbox`, `Switch`) are always Client Components — they require JavaScript for interactivity and accessibility (keyboard navigation, ARIA). They cannot benefit from Formy's `RestoreInputValue` restoration directly.
+Shadcn and Radix UI components (e.g. `Select`, `Checkbox`, `Switch`) are always Client Components — they require JavaScript for interactivity and accessibility (keyboard navigation, ARIA). They cannot benefit from Formy's automatic `FormyRestoreEngine` restoration directly.
 
 Use `useFormyErrors` to connect any custom component to Formy's error system. It gives you the current field error and `clearFieldError` — without prop-drilling or form-level event duplication.
 
@@ -591,13 +591,13 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 | `onStateChange` | `(state) => void` | `undefined` | Client callback fired on every new Server Action state. |
 | `clearOnSuccess` | `boolean` | `true` | When `true`, clears the saved values and resets the form on success. When `false`, preserves values. |
 | `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
-| `staticMode` | `boolean` | `true` | When `true` (default), loads `RestoreInputValue` to handle DOM-level value restoration on Server Action error. When `false`, renders plain inputs directly without dynamic loading. |
+| `staticMode` | `boolean` | `true` | When `true` (default), loads `FormyRestoreEngine` to handle DOM-level value restoration on Server Action error. When `false`, renders plain inputs directly without dynamic loading. |
 
 ---
 
 ### `<FormyInput>` Props
 
-Extends all standard `<input>` props. Wraps the native input in `RestoreInputValue` (lazy-loaded) for automatic value restoration.
+Extends all standard `<input>` props. Renders a native `<input>` element with the `data-formy-input` marker attribute so that `FormyRestoreEngine` can restore it.
 
 ---
 
@@ -689,6 +689,17 @@ type FormyActionState =
     | void
     | null;
 ```
+
+## Formy vs. Alternatives
+
+| Feature / Library | **Formy** | **Conform** | **React Hook Form / TanStack Form** |
+| :--- | :--- | :--- | :--- |
+| **Input Rendering Mode** | **React Server Components (RSC)** (Zero-JS layout) | React Server Components (RSC) | Client Components only (`'use client'`) |
+| **React 19 Auto-Reset Fix** | **Yes** (restores DOM synchronously after reset) | No (wiped by auto-reset before `defaultValue` updates) | Yes (bypassed via controlled state) |
+| **Rerender Optimization** | **Surgical** (only affected error field re-renders) | Component-wide | Form-wide or watch-based |
+| **Dependencies** | **0 dependencies** | Zero dependencies | Depends on library weight/schemas |
+
+Unlike other RSC-capable libraries (like Conform) which rely on feeding `defaultValue` back into inputs, Formy is built to handle React 19's aggressive post-action form reset. Conform suffers from a timing issue where React's auto-reset wipes inputs before new default values can be bound. Formy sidesteps this by using form-wide event delegation and a synchronous `useLayoutEffect` DOM-level restoration after the reset occurs, ensuring zero data loss and zero input layout hydration.
 
 ---
 
