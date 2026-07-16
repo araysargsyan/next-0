@@ -4,7 +4,6 @@ import {COOKIE_NAMES, PUBLIC_ROUTES} from "@/config";
 import {createLogger} from "@/libs/utils/logger";
 
 const log = createLogger('Proxy', 'yellow');
-
 export default async function proxy(req: NextRequest) {
     const {pathname} = req.nextUrl;
     const accessToken = req.cookies.get(COOKIE_NAMES.accessToken)?.value;
