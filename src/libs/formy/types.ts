@@ -9,11 +9,11 @@ import type {
 } from "react";
 import Form from "next/form";
 
-export type FormyActionState = { error: string | Record<string, string> | null }
-    | { data: unknown }
+export type FormyActionState<T = unknown> = { error: string | Record<string, string> | null }
+    | { data: T }
     | void | null;
 
-export type FormyAction<State extends FormyActionState = FormyActionState> =
+export type FormyAction<T = unknown, State extends FormyActionState<T> = FormyActionState<T>> =
     ((state: Awaited<State>, payload: FormData) => State | Promise<State>)
 
 export interface FormyProps<State extends FormyActionState = FormyActionState>
