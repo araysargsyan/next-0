@@ -32,14 +32,18 @@ export function ProductNameSelect({
     const containerRef: RefObject<HTMLDivElement | null> = useRef(null);
     const hiddenInputRef = useRef<HTMLInputElement>(null);
 
-    // Sync selected value with hidden input on form submission success/error
+    // Render-time state adjustment: reset selection on success
+    // (React-sanctioned pattern — no effect needed for derived state reset)
+    if (state && "data" in state && selected !== defaultValue) {
+        setSelected(defaultValue);
+    }
+
+    // Sync hidden input value after server action (before paint)
     useLayoutEffect(() => {
-        if (state && "data" in state) {
-            setSelected(defaultValue);
-        } else if (hiddenInputRef.current) {
+        if (hiddenInputRef.current) {
             hiddenInputRef.current.value = selected;
         }
-    }, [state, selected, defaultValue]);
+    }, [state, selected]);
 
     // Close dropdown on outside click
     useEffect(() => {
