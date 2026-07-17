@@ -4,11 +4,11 @@ import {useActionState, useState, type ComponentProps} from "react";
 import type {FormyAction, FormyActionState} from "../types";
 import Form from "next/form";
 
-export function useFormyActionState<State extends FormyActionState = FormyActionState>(
-    action: string | undefined | FormyAction<State>,
-    initialState: Awaited<State>,
+export function useFormyActionState(
+    action: string | undefined | FormyAction,
+    initialState: Awaited<FormyActionState>,
 ): [
-    state: Awaited<State>,
+    state: Awaited<FormyActionState>,
     dispatch: ComponentProps<typeof Form>['action'] | null,
     isPending: boolean
 ] {

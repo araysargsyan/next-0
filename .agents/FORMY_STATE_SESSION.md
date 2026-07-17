@@ -183,9 +183,72 @@ export { FormyError, FormySubmit, FormySuccess, FormyInput } from "./components"
 - [ ] **DynamicInput / RestoreInputValue — architectural fate:**
   These per-input client wrappers (`cloneElement` + `useRef` cache) exist in parallel with the form-level `FormyRestoreEngine` (event delegation + `Map` cache). Need to decide: remove them entirely (FormyRestoreEngine covers everything), keep as an opt-in alternative, or merge approaches.
 
+- [ ] **Рефакторинг FormyRestoreEngine на Reset-Interception:**
+  Переписать `FormyRestoreEngine.tsx` на легковесный перехват события `reset` (`preventDefault` + `isTrusted` + `allowReset` флаг). Изменение полностью изолировано внутри логики сброса и не ломает публичный API/инпуты.
+
 - [ ] **`until(3000)` debug delay in DynamicInput.tsx:**
   The artificial 3-second delay in the dynamic import is still present. Needs removal before production/NPM release.
 
 ---
 
 *Last updated: July 17, 2026*
+
+---
+
+## 8. Reset-Interception vs. Value-Restoration (Сравнительный анализ)
+
+В ходе технической дискуссии от 17 июля 2026 г. был исследован альтернативный легковесный подход к предотвращению автоматического сброса формы React 19.
+
+### 8.1. Суть альтернативного подхода (Reset-Interception)
+Метод основывается на перехвате события `reset` на форме и отмене его стандартного поведения:
+1. **Перехват авто-сброса React**: 
+   ```typescript
+   form.addEventListener("reset", (e) => {
+       if (!e.isTrusted) e.preventDefault();
+   });
+   ```
+   Проверка `!e.isTrusted` позволяет отсечь программные события сброса от React 19 (у которых `isTrusted === false`), сохраняя при этом работоспособность стандартных пользовательских кнопок очистки формы `<button type="reset">` (у них `isTrusted === true`).
+2. **Программный сброс при успехе**: 
+   Для штатной очистки формы при успешной отправке (когда `clearOnSuccess === true`) вызывается нативный метод прототипа, который не вызывает событие `reset` повторно в некоторых браузерах или обходит блокировку:
+   ```typescript
+   HTMLFormElement.prototype.reset.call(form);
+   ```
+3. **Защита от гонок состояний**:
+   Проблема быстрого ввода во время сетевого запроса решается блокировкой всей формы через `<fieldset disabled={isPending}>`.
+
+### 8.2. Сравнение подходов
+
+| Критерий | Текущий подход Formy (Value-Restoration) | Альтернативный подход (Reset-Interception) |
+| :--- | :--- | :--- |
+| **Сложность кода** | **Высокая**. Требует парсинга всех типов DOM-узлов (радио, чекбоксы, файлы) и их ручного заполнения в [FormyRestoreEngine.tsx](file:///C:/Users/arays/Documents/Projects/next-0/src/libs/formy/components/FormyRestoreEngine.tsx). | **Минимальная**. Буквально несколько строк кода для отмены события. DOM сохраняет значения нативно. |
+| **Производительность** | **Средняя**. Слушает события `input` и `change` на каждое нажатие клавиши, хранит данные в `Map`. | **Максимальная**. Ноль дополнительных слушателей ввода, ноль затрат памяти на хранение значений. |
+| **Работа с File-инпутами** | Сложная логика с `DataTransfer` для повторной инициализации файлов. | Нативное сохранение файлов в инпуте (браузер просто не сбрасывает их). |
+| **Клиентские компоненты (`staticMode=false`)** | Полная поддержка. Контролируемые компоненты восстанавливают стейт корректно. | **Не работает**. Клиентские стейты кастомных компонентов (Shadcn/Radix) сбросятся независимо от `preventDefault()` на DOM. |
+| **Надежность спецификации** | **Максимальная**. Использует легальный `useLayoutEffect` после коммита стейта React. | **Средняя (хак)**. Поведение `requestFormReset` в React 19 не имеет официального API для отключения, логика может измениться в патчах. |
+
+### 8.3. Снятие технических возражений по Reset-Interception
+В ходе обсуждения были опровергнуты первоначальные возражения против использования `preventDefault()` на событии `reset`:
+1. **Проблема `formRef`**: Оркестратор `<Formy>` изначально является клиентским компонентом (`"use client"`), поэтому наличие ссылки на форму не накладывает дополнительных ограничений на серверный статус самих инпутов `<FormyInput>`.
+2. **Проблема перезаписи данных с сервера (`defaultValue`)**: Если сервер вернул измененные данные, их можно легко записать в DOM поверх предотвращенного сброса в фазе `useLayoutEffect`, аналогично текущей логике восстановления.
+3. **Совместимость с внешними клиентскими библиотеками**: Чтобы сторонние библиотеки (например, Shadcn) могли сбросить свой внутренний стейт по событию `reset` при успешной отправке формы, используется флаг `allowReset`:
+   ```typescript
+   let allowReset = false;
+   form.addEventListener("reset", (e) => {
+       if (allowReset) return;
+       if (!e.isTrusted) e.preventDefault();
+   });
+   
+   // При успешном сабмите:
+   allowReset = true;
+   form.reset(); // Вызовет событие reset для всех, но пропустит наш обработчик
+   ```
+
+### 8.4. Финальный архитектурный вывод
+Альтернативный подход с перехватом события `reset` и проверкой `!e.isTrusted` признан **полностью пригодным, более легковесным и производительным** для работы Formy в режиме чистых RSC-компонентов (`staticMode=true`). 
+
+**Рекомендация по рефакторингу**:
+Внедрить гибридный режим в Formy:
+* При `staticMode=true` (чистые RSC инпуты) использовать легковесный перехват `reset` + флаг `allowReset` (убирает необходимость в `onChange`/`input` слушателях для кэширования и циклическом восстановлении DOM-дерева в [FormyRestoreEngine.tsx](file:///C:/Users/arays/Documents/Projects/next-0/src/libs/formy/components/FormyRestoreEngine.tsx)).
+* При `staticMode=false` (контролируемые клиентские инпуты) использовать стандартную логику кэширования и синхронизации стейта.
+
+

@@ -51,16 +51,11 @@ When `staticMode={false}` is set on `<Formy>`, the dynamic value restoration log
 // app/sign-in/actions.ts
 'use server'
 
-// FormyActionState is the base constraint for all Formy action return types.
-// See the "FormyActionState Type" section in the API Reference below.
-type FormyActionState = { error: string | Record<string, string> | null }
-    | { data: unknown }
-    | void | null;
+import type { FormyAction } from 'formy-next';
 
-export async function signInAction(
-    _state: FormyActionState | null,
-    formData: FormData
-): Promise<FormyActionState> {
+// FormyAction<T> types both the state parameter and the return value.
+// Use the generic parameter to narrow the success `data` type (defaults to `unknown`).
+export const signInAction: FormyAction = async (_state, formData) => {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
@@ -70,7 +65,7 @@ export async function signInAction(
     }
 
     return { data: null };
-}
+};
 ```
 
 ### 2. Build the Form
@@ -310,12 +305,13 @@ Use `onStateChange` to run client-side logic (redirect, `localStorage`, etc.) wh
 
 import { useRouter } from 'next/navigation';
 
-type FormyActionState = { error: string | Record<string, string> | null }
-    | { data: unknown }
-    | void | null;
+import type { FormyAction } from 'formy-next';
+
+// Extract the state type from the public FormyAction type.
+type ActionState = Parameters<FormyAction>[0];
 
 export const handleStateChange = (
-    state: FormyActionState | null,
+    state: ActionState,
     router: ReturnType<typeof useRouter>
 ) => {
     if (state && 'data' in state) {
@@ -491,35 +487,29 @@ export default function RegisterForm() {
 
 ```tsx
 import Formy, { FormyInput, FormySubmit } from 'formy-next';
+import type { FormyAction } from 'formy-next';
 
-// Define the type locally — FormyActionState is not exported from the root barrel.
-type FormyActionState = { error: string | Record<string, string> | null }
-    | { data: unknown }
-    | void | null;
+// Use FormyAction<T> to type the action with a custom success payload.
+// The generic parameter narrows the `data` field in both state and return type.
+type UserData = { userId: string };
 
-type MyState = FormyActionState & {
-    data?: { userId: string } | null;
-};
-
-export async function myAction(
-    _state: MyState | null,
-    formData: FormData
-): Promise<MyState> {
+export const myAction: FormyAction<UserData> = async (_state, formData) => {
     return { data: { userId: '123' } };
-}
+};
 
 export default function CustomStateForm() {
     return (
-        <Formy<MyState> action={myAction}>
-            {(state) => (
-                <>
-                    <FormyInput name="username" />
-                    {state && 'data' in state && state.data?.userId && (
-                        <p>Welcome, user {state.data.userId}!</p>
-                    )}
-                    <FormySubmit>Submit</FormySubmit>
-                </>
-            )}
+        <Formy action={myAction}>
+            {(state) => {
+                const data = state && 'data' in state ? (state.data as UserData) : null;
+                return (
+                    <>
+                        <FormyInput name="username" />
+                        {data?.userId && <p>Welcome, user {data.userId}!</p>}
+                        <FormySubmit>Submit</FormySubmit>
+                    </>
+                );
+            }}
         </Formy>
     );
 }
@@ -649,13 +639,6 @@ Renders children only when `state` contains the `data` discriminant.
 
 ---
 
-### `useFormyActionState<State>(action, initialState)`
-
-Wraps React 19's `useActionState`. Safely handles both Server Action functions and plain URL strings. Throws a developer-friendly error if the action type changes dynamically (which would violate React's Rules of Hooks).
-
-**Returns:** `[state, dispatch, isPending]`
-
----
 
 ### `useFormyErrors(name?)`
 
@@ -686,22 +669,35 @@ Hook for accessing the current form state and pending status. Must be called ins
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `state` | `FormyActionState \| null` | The current action state returned by the server. |
+| `state` | `{ error: ... } \| { data: ... } \| void \| null` | The current action state. Discriminated union — narrow with `'data' in state` or `'error' in state`. |
 | `isPending` | `boolean` | Whether the form submission is currently pending. |
 
 ---
 
-### `FormyActionState` Type
+### `FormyAction<T>` Type
 
-The base constraint for all Formy action return types.
+The public type for typing Server Action functions compatible with Formy. Exported from `formy-next`.
+
+The generic parameter `T` narrows the success `data` field (defaults to `unknown`).
 
 ```tsx
-type FormyActionState =
-    | { error: string | Record<string, string> | null }
-    | { data: unknown }
-    | void
-    | null;
+import type { FormyAction } from 'formy-next';
+
+// Default: data is `unknown`
+const basicAction: FormyAction = async (state, formData) => {
+    return { error: 'Something went wrong.' };
+};
+
+// Narrowed: data is `{ userId: string }`
+const typedAction: FormyAction<{ userId: string }> = async (state, formData) => {
+    return { data: { userId: '123' } };
+};
 ```
+
+The action must return one of:
+- `{ error: string | Record<string, string> | null }` — validation error (global or per-field)
+- `{ data: T }` — success payload
+- `void | null` — no-op
 
 ## Formy vs. Alternatives
 

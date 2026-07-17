@@ -13,12 +13,12 @@ export type FormyActionState<T = unknown> = { error: string | Record<string, str
     | { data: T }
     | void | null;
 
-export type FormyAction<T = unknown, State extends FormyActionState<T> = FormyActionState<T>> =
-    ((state: Awaited<State>, payload: FormData) => State | Promise<State>)
+export type FormyAction<T = unknown> =
+    ((state: Awaited<FormyActionState<T>>, payload: FormData) => FormyActionState<T> | Promise<FormyActionState<T>>)
 
 export interface FormyProps<State extends FormyActionState = FormyActionState>
     extends Omit<ComponentProps<typeof Form>, "children" | "action"> {
-    action?: string | FormyAction<State>;
+    action?: string | FormyAction;
     initialState?: Awaited<State> | null;
     children?: ReactNode | ((state: Awaited<State>, isPending: boolean) => ReactNode);
     onStateChange?: (state: Awaited<State>) => void;
