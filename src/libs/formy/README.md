@@ -51,7 +51,11 @@ When `staticMode={false}` is set on `<Formy>`, the dynamic value restoration log
 // app/sign-in/actions.ts
 'use server'
 
-import type { FormyActionState } from 'formy-next';
+// FormyActionState is the base constraint for all Formy action return types.
+// See the "FormyActionState Type" section in the API Reference below.
+type FormyActionState = { error: string | Record<string, string> | null }
+    | { data: unknown }
+    | void | null;
 
 export async function signInAction(
     _state: FormyActionState | null,
@@ -133,7 +137,8 @@ Formy supports four main usage scenarios depending on your rendering strategy an
   'use client';
   import { useState, useContext, useLayoutEffect, useRef } from 'react';
   import { Input as LibraryInput } from "@/components/ui/input";
-  import { FormyContext, FormyModeContext } from 'formy-next/contexts';
+  import { FormyContext } from 'formy-next/contexts/FormyContext';
+  import { FormyModeContext } from 'formy-next/contexts/FormyModeContext';
   import { useFormyErrors, FormyError } from 'formy-next';
 
   export function CustomRscInput({ name, placeholder }: { name: string; placeholder?: string }) {
@@ -165,7 +170,7 @@ Formy supports four main usage scenarios depending on your rendering strategy an
       return (
           <div className="relative mb-6">
               <LibraryInput name={name} value={value} onChange={handleChange} placeholder={placeholder} />
-              <FormyError field={name} below />
+              <FormyError field={name} />
           </div>
       );
   }
@@ -177,7 +182,8 @@ Formy supports four main usage scenarios depending on your rendering strategy an
   'use client';
   import { useState, useContext, useLayoutEffect, useRef } from 'react';
   import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-  import { FormyContext, FormyModeContext } from 'formy-next/contexts';
+  import { FormyContext } from 'formy-next/contexts/FormyContext';
+  import { FormyModeContext } from 'formy-next/contexts/FormyModeContext';
   import { useFormyErrors, FormyError } from 'formy-next';
 
   export function CustomRscSelect({ name }: { name: string }) {
@@ -214,7 +220,7 @@ Formy supports four main usage scenarios depending on your rendering strategy an
                       <SelectItem value="user">User</SelectItem>
                   </SelectContent>
               </Select>
-              <FormyError field={name} below />
+              <FormyError field={name} />
           </div>
       );
   }
@@ -303,7 +309,10 @@ Use `onStateChange` to run client-side logic (redirect, `localStorage`, etc.) wh
 'use client'
 
 import { useRouter } from 'next/navigation';
-import type { FormyActionState } from 'formy-next';
+
+type FormyActionState = { error: string | Record<string, string> | null }
+    | { data: unknown }
+    | void | null;
 
 export const handleStateChange = (
     state: FormyActionState | null,
@@ -482,7 +491,11 @@ export default function RegisterForm() {
 
 ```tsx
 import Formy, { FormyInput, FormySubmit } from 'formy-next';
-import type { FormyActionState } from 'formy-next';
+
+// Define the type locally — FormyActionState is not exported from the root barrel.
+type FormyActionState = { error: string | Record<string, string> | null }
+    | { data: unknown }
+    | void | null;
 
 type MyState = FormyActionState & {
     data?: { userId: string } | null;
@@ -549,7 +562,7 @@ export function CountrySelect({ name, defaultValue }: CountrySelectProps) {
                     <SelectItem value="de">Germany</SelectItem>
                 </SelectContent>
             </Select>
-            <FormyError field={name} below />
+            <FormyError field={name} />
         </div>
     );
 }
@@ -590,7 +603,7 @@ Extends all standard `next/form` (`<Form>`) props, omitting `children` and `acti
 | `children` | `ReactNode \| ((state, isPending) => ReactNode)` | — | Form content. Accepts JSX or a render-prop function. Render-prop receives the raw `Awaited<State> \| null`. |
 | `onStateChange` | `(state) => void` | `undefined` | Client callback fired on every new Server Action state. |
 | `clearOnSuccess` | `boolean` | `true` | When `true`, clears the saved values and resets the form on success. When `false`, preserves values. |
-| `className` | `string` | `"flex flex-col gap-4 w-full max-w-sm"` | CSS class for the `<form>` element. |
+| `className` | `string` | `""` | CSS class for the `<form>` element. |
 | `staticMode` | `boolean` | `true` | When `true` (default), loads `FormyRestoreEngine` to handle DOM-level value restoration on Server Action error. When `false`, renders plain inputs directly without dynamic loading. |
 
 ---
@@ -603,14 +616,14 @@ Extends all standard `<input>` props. Renders a native `<input>` element with th
 
 ### `<FormyError>` Props
 
-Renders field-specific or global error messages. Merges server errors and client-side validation errors. Zero layout shift by default (absolute positioning).
+Renders field-specific or global error messages. Merges server errors and client-side validation errors. Positioning and styling are fully controlled via `className` and `style` props.
 
 | Prop | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `field` | `string` | `"__global__"` | Target input name. Omit for the global error. |
 | `validate` | `(value: string) => string \| null` | `undefined` | Client-side validator. Must be defined in a `'use client'` module. |
-| `below` | `boolean` | `false` | Positions the error below the input. Default is above. |
-| `absolute` | `boolean` | `true` | Absolute positioning to prevent layout shifts. Set `false` for in-flow rendering. |
+| `className` | `string` | `""` | CSS class for the error wrapper `<div>`. |
+| `style` | `CSSProperties` | `undefined` | Inline styles for the error wrapper `<div>`. |
 | `helpText` | `string` | `undefined` | Static text inside the glassmorphism help tooltip. (Mutually exclusive with `parseMessage`) |
 | `parseMessage` | `(msg: string) => { title: string; info?: string }` | `undefined` | Splits one error string into a short title and a detailed tooltip body. (Mutually exclusive with `helpText`) |
 
